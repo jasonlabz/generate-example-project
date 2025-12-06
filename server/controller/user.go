@@ -17,7 +17,7 @@ import (
 //	@Tags		用户相关接口
 //	@Accept		json
 //	@Produce	json
-//	@Param		user_id	path		string			true	"用户ID"
+//	@Param		user_id	path		string									true	"用户ID"
 //	@Success	200		{object}	base.Response{data=body.UserInfoDto}	"ok"
 //	@Router		/v1/user/info/{user_id} [get]
 func GetUserInfo(c *gin.Context) {
@@ -57,7 +57,7 @@ func RegisterUser(c *gin.Context) {
 //	@Accept		json
 //	@Produce	json
 //	@Param		update_info	body		body.UserUpdateFieldDto	true	"用户信息"
-//	@Success	200			{object}	base.Response				"ok"
+//	@Success	200			{object}	base.Response			"ok"
 //	@Router		/v1/user/info [put]
 func UpdateUserInfo(c *gin.Context) {
 	params := &body.UserUpdateFieldDto{}
