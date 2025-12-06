@@ -10,11 +10,12 @@ import (
 
 	_ "github.com/jasonlabz/generate-example-project/docs"
 	"github.com/jasonlabz/generate-example-project/server/controller"
+	"github.com/jasonlabz/generate-example-project/server/routers/v1/user"
 )
 
 // InitApiRouter 封装路由
 func InitApiRouter() *gin.Engine {
-	router := gin.Default()
+	router := gin.New()
 	serverConfig := configx.GetConfig()
 
 	// 全局中间件，查看定义的中间价在middlewares文件夹中
@@ -68,5 +69,6 @@ func registerBaseAPI(router *gin.RouterGroup) {}
 
 // 注册組路由 http://ip:port/server_name/api/v1/**
 func registerV1GroupAPI(router *gin.RouterGroup) {
-	// v1.RegisterSchedulerManagerGroup(router)
+	userGroup := router.Group("user")
+	user.RegisterUserGroup(userGroup)
 }

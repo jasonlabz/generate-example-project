@@ -1,5 +1,5 @@
-package dto
+package body
 
-type HealthCheckResDto struct {
+type HealthCheckReqDto struct {
 	FieldName string `json:"field_name"` // 属性名
 }
