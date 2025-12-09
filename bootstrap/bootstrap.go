@@ -10,9 +10,12 @@ import (
 	"github.com/jasonlabz/potato/cryptox"
 	"github.com/jasonlabz/potato/cryptox/aes"
 	"github.com/jasonlabz/potato/cryptox/des"
+	"github.com/jasonlabz/potato/es"
+	"github.com/jasonlabz/potato/goredis"
 	"github.com/jasonlabz/potato/gormx"
 	"github.com/jasonlabz/potato/httpx"
 	"github.com/jasonlabz/potato/log"
+	"github.com/jasonlabz/potato/rabbitmqx"
 	"github.com/jasonlabz/potato/utils"
 
 	"github.com/jasonlabz/generate-example-project/global/resource"
@@ -29,6 +32,12 @@ func MustInit(ctx context.Context) {
 	initCrypto(ctx)
 	// 初始化DB
 	initDB(ctx)
+	// 初始化RMQ
+	initRMQ(ctx)
+	// 初始化Redis
+	initRedis(ctx)
+	// 初始化ES
+	initES(ctx)
 	// 初始化客户端信息
 	initServicer(ctx)
 }
@@ -70,7 +79,7 @@ func initCrypto(_ context.Context) {
 }
 
 func initDB(_ context.Context) {
-	dbConf := configx.GetConfig().Database
+	dbConf := configx.GetConfig().DataSource
 	if !dbConf.Enable {
 		return
 	}
@@ -87,6 +96,21 @@ func initDB(_ context.Context) {
 		panic(err)
 	}
 	// dao.SetGormDB(db)
+}
+
+func initRMQ(_ context.Context) {
+	// 走默认初始化逻辑
+	resource.RMQClient = rabbitmqx.GetRabbitMQOperator()
+}
+
+func initRedis(_ context.Context) {
+	// 走默认初始化逻辑
+	resource.RedisClient = goredis.GetRedisOperator()
+}
+
+func initES(_ context.Context) {
+	// 走默认初始化逻辑
+	resource.EsClient = es.GetESOperator()
 }
 
 func initConfig(_ context.Context) {

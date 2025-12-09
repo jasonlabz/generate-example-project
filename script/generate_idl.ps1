@@ -45,7 +45,7 @@ function Check-Kitex {
         Write-InfoLog "Installing kitex..."
         try {
             go install github.com/cloudwego/kitex/tool/cmd/kitex@latest
-
+            
             # 安装后重新检查
             $kitexPath = Join-Path $env:GOPATH "bin" "kitex.exe"
             if (Test-Path $kitexPath) {
@@ -87,7 +87,7 @@ function Check-Kitex {
 # 从文件路径提取服务名（不带后缀）
 function Get-ServiceName {
     param([string]$FilePath)
-
+    
     $filename = Split-Path $FilePath -Leaf
     $serviceName = [System.IO.Path]::GetFileNameWithoutExtension($filename)
     return $serviceName
@@ -124,7 +124,7 @@ function Invoke-KitexGeneration {
     }
 
     Write-InfoLog "Generating from: $IdlFile"
-
+    
     # 构建完整的命令
     $fullArgs = @()
     $baseArgs -split ' ' | Where-Object { $_ -ne "" } | ForEach-Object { $fullArgs += $_ }
@@ -184,9 +184,9 @@ function Generate-Thrift {
         Write-InfoLog "Processing: $thriftFile"
 
         if (Invoke-KitexGeneration -Type "thrift" `
-            -Message "Generate thrift from $thriftFile..." `
+			-Message "Generate thrift from $thriftFile..." `
             -ExtraArgs "-thrift frugal_tag -invoker" `
-            -IdlFile $thriftFile `
+			-IdlFile $thriftFile `
             -GenPath $CLIENT_DIR) {
             $successCount++
         }
@@ -227,20 +227,20 @@ function Generate-ThriftService {
         Write-InfoLog "Processing (service): $thriftFile"
 
         if (Invoke-KitexGeneration -Type "thrift service" `
-            -Message "Generate thrift service from $thriftFile..." `
+			-Message "Generate thrift service from $thriftFile..." `
             -ExtraArgs "-thrift frugal_tag -invoker" `
-            -IdlFile $thriftFile `
+			-IdlFile $thriftFile `
             -GenPath $SERVER_DIR `
-            -UseService $true) {
-            $successCount++
-        }
-        else {
-            $failCount++
-        }
-    }
+			-UseService $true) {
+			$successCount++
+		}
+		else {
+			$failCount++
+		}
+	}
 
-    Write-InfoLog "Thrift service generation completed: $successCount successful, $failCount failed"
-    return $failCount -eq 0
+	Write-InfoLog "Thrift service generation completed: $successCount successful, $failCount failed"
+	return $failCount -eq 0
 }
 
 # 遍历生成所有 slim thrift 文件（默认不加 -service）
@@ -271,9 +271,9 @@ function Generate-ThriftSlim {
         Write-InfoLog "Processing (slim): $thriftFile"
 
         if (Invoke-KitexGeneration -Type "thrift(slim)" `
-            -Message "Generate slim thrift from $thriftFile..." `
+			-Message "Generate slim thrift from $thriftFile..." `
             -ExtraArgs "-thrift frugal_tag -thrift template=slim" `
-            -IdlFile $thriftFile `
+			-IdlFile $thriftFile `
             -GenPath "$CLIENT_DIR/slim") {
             $successCount++
         }
@@ -314,20 +314,20 @@ function Generate-ThriftSlimService {
         Write-InfoLog "Processing (slim service): $thriftFile"
 
         if (Invoke-KitexGeneration -Type "thrift(slim) service" `
-            -Message "Generate slim thrift service from $thriftFile..." `
+			-Message "Generate slim thrift service from $thriftFile..." `
             -ExtraArgs "-thrift frugal_tag -thrift template=slim" `
-            -IdlFile $thriftFile `
+			-IdlFile $thriftFile `
             -GenPath "$SERVER_DIR/slim" `
-            -UseService $true) {
-            $successCount++
-        }
-        else {
-            $failCount++
-        }
-    }
+			-UseService $true) {
+			$successCount++
+		}
+		else {
+			$failCount++
+		}
+	}
 
-    Write-InfoLog "Slim thrift service generation completed: $successCount successful, $failCount failed"
-    return $failCount -eq 0
+	Write-InfoLog "Slim thrift service generation completed: $successCount successful, $failCount failed"
+	return $failCount -eq 0
 }
 
 # Protobuf 生成函数（默认不加 -service）
@@ -363,9 +363,9 @@ function Generate-Protobuf {
         Write-InfoLog "Processing: $protoFile"
 
         if (Invoke-KitexGeneration -Type "protobuf" `
-            -Message "Generate protobuf from $protoFile..." `
+			-Message "Generate protobuf from $protoFile..." `
             -ExtraArgs "" `
-            -IdlFile $protoFile `
+			-IdlFile $protoFile `
             -GenPath $CLIENT_DIR) {
             $successCount++
         }
@@ -406,9 +406,9 @@ function Generate-ProtobufService {
         Write-InfoLog "Processing (service): $protoFile"
 
         if (Invoke-KitexGeneration -Type "protobuf service" `
-            -Message "Generate protobuf service from $protoFile..." `
+			-Message "Generate protobuf service from $protoFile..." `
             -ExtraArgs "" `
-            -IdlFile $protoFile `
+	      	-IdlFile $protoFile `
             -GenPath $SERVER_DIR `
             -UseService $true) {
             $successCount++
