@@ -2,7 +2,6 @@ package bootstrap
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 
 	"github.com/jasonlabz/potato/configx"
@@ -10,12 +9,9 @@ import (
 	"github.com/jasonlabz/potato/cryptox"
 	"github.com/jasonlabz/potato/cryptox/aes"
 	"github.com/jasonlabz/potato/cryptox/des"
-	"github.com/jasonlabz/potato/es"
-	"github.com/jasonlabz/potato/goredis"
 	"github.com/jasonlabz/potato/gormx"
 	"github.com/jasonlabz/potato/httpx"
 	"github.com/jasonlabz/potato/log"
-	"github.com/jasonlabz/potato/rabbitmqx"
 	"github.com/jasonlabz/potato/utils"
 
 	"github.com/jasonlabz/generate-example-project/global/resource"
@@ -47,24 +43,11 @@ func initLogger(_ context.Context) {
 }
 
 func initResource(_ context.Context) {
-	resource.Username = func() string {
-		user := os.Getenv("AUTH_USER")
-		if user != "" {
-			return user
-		}
-		return "admin"
-	}()
-	resource.Password = func() string {
-		passwd := os.Getenv("AUTH_PASSWD")
-		if passwd != "" {
-			return passwd
-		}
-		return "admin"
-	}()
+	// all global variable should be initial
 }
 
 func initCrypto(_ context.Context) {
-	cryptoConfigs := configx.GetConfig().Crypto
+	cryptoConfigs := GetConfig().Crypto
 	for _, conf := range cryptoConfigs {
 		if conf.Key == "" {
 			continue
@@ -79,7 +62,7 @@ func initCrypto(_ context.Context) {
 }
 
 func initDB(_ context.Context) {
-	dbConf := configx.GetConfig().DataSource
+	dbConf := GetConfig().DataSource
 	if !dbConf.Enable {
 		return
 	}
@@ -100,30 +83,31 @@ func initDB(_ context.Context) {
 
 func initRMQ(_ context.Context) {
 	// 走默认初始化逻辑
-	resource.RMQClient = rabbitmqx.GetRabbitMQOperator()
+	// resource.RMQClient = rabbitmqx.GetRabbitMQOperator()
 }
 
 func initRedis(_ context.Context) {
 	// 走默认初始化逻辑
-	resource.RedisClient = goredis.GetRedisOperator()
+	// resource.RedisClient = goredis.GetRedisOperator()
 }
 
 func initES(_ context.Context) {
 	// 走默认初始化逻辑
-	resource.EsClient = es.GetESOperator()
+	// resource.EsClient = es.GetESOperator()
 }
 
 func initConfig(_ context.Context) {
 	filePaths, err := utils.ListDir("conf", ".yaml")
 	if err != nil {
-		filePaths = []string{filepath.Join("conf", "core.yaml")}
+		filePaths = []string{}
 	}
 	for _, filePath := range filePaths {
+		fileName := filepath.Base(filePath)
 		provider, err := file.NewConfigProvider(filePath)
 		if err != nil {
 			continue
 		}
-		configx.AddProviders(filePath, provider)
+		configx.AddProviders(fileName, provider)
 	}
 }
 

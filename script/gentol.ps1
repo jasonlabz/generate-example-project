@@ -87,10 +87,10 @@ function Build-Dsn {
 function Build-Args {
     $argsList = @(
         "--db_type=$DB_TYPE"
-        "--dsn=`"$DSN`""
-        "--model=$MODEL_DIR"
-        "--dao=$DAO_DIR"
-    )
+        "--dsn=`"$DSN`"
+		"--model=$MODEL_DIR"
+		"--dao=$DAO_DIR"
+	)
 
     if ($TABLES -ne "") {
         $argsList += "--table=$TABLES"

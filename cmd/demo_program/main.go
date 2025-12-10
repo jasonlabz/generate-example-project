@@ -12,11 +12,9 @@ import (
 	"syscall"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jasonlabz/potato/configx"
 	"github.com/jasonlabz/potato/ginmetrics"
 
 	"github.com/jasonlabz/generate-example-project/bootstrap"
-	"github.com/jasonlabz/generate-example-project/global/resource"
 	"github.com/jasonlabz/generate-example-project/server/routers"
 )
 
@@ -38,7 +36,7 @@ func main() {
 
 	// gin mode
 	serverMode := gin.ReleaseMode
-	serverConfig := configx.GetConfig()
+	serverConfig := bootstrap.GetConfig()
 	if serverConfig.IsDebugMode() {
 		serverMode = gin.DebugMode
 	}
@@ -74,14 +72,12 @@ func main() {
 		}()
 	}
 
-	if serverConfig.Application.FileServer {
-		go func() {
-			fileServer(serverConfig.Application.Port + 1)
-		}()
-	}
+	go func() {
+		fileServer(serverConfig.GetServerConfig().Static)
+	}()
 
 	// start program
-	srv := startServer(r, serverConfig.Application.Port)
+	srv := startServer(r, serverConfig.GetHTTPPort())
 
 	// receive quit signal, ready to exit
 	quit := make(chan os.Signal)
@@ -113,17 +109,26 @@ func startServer(router *gin.Engine, port int) *http.Server {
 }
 
 // fileServer 文件服务
-func fileServer(port int) {
+func fileServer(config bootstrap.StaticConfig) {
 	// 创建 HTTP 服务器
+	if config.Path == "" {
+		return
+	}
 	mux := http.NewServeMux()
-	filePath, _ := os.Getwd()
-	mux.Handle("/", http.FileServer(http.Dir(filePath)))
-	// 使用基本认证保护文件下载路由
-	authMux := basicAuth(mux)
-
+	mux.Handle("/", http.FileServer(http.Dir(config.Path)))
+	if config.Username != "" && config.Password != "" {
+		// 使用基本认证保护文件下载路由
+		authMux := basicAuth(mux, config.Username, config.Password)
+		// 启动 HTTP 服务器
+		// log.Printf("Starting file server at :%d", config.GetConfig().Application.Port+1)
+		err := http.ListenAndServe(fmt.Sprintf(":%d", config.Port), authMux)
+		if err != nil {
+			log.Fatalf("file server listen: %s\n", err)
+		}
+		return
+	}
 	// 启动 HTTP 服务器
-	// log.Printf("Starting file server at :%d", config.GetConfig().Application.Port+1)
-	err := http.ListenAndServe(fmt.Sprintf(":%d", port), authMux)
+	err := http.ListenAndServe(fmt.Sprintf(":%d", config.Port), mux)
 	if err != nil {
 		log.Fatalf("file server listen: %s\n", err)
 	}
@@ -131,10 +136,10 @@ func fileServer(port int) {
 }
 
 // basicAuth 认证检查
-func basicAuth(handler http.Handler) http.Handler {
+func basicAuth(handler http.Handler, username, password string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, pass, ok := r.BasicAuth()
-		if !ok || user != resource.Username || pass != resource.Password {
+		if !ok || user != username || pass != password {
 			w.Header().Set("WWW-Authenticate", `Basic realm="Restricted"`)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return

@@ -7,12 +7,6 @@ import (
 	"github.com/jasonlabz/potato/rabbitmqx"
 )
 
-// 文件服务账号密码
-var (
-	Username string
-	Password string
-)
-
 // Logger 日志对象
 var Logger *log.LoggerWrapper
 

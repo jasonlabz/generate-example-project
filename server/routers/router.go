@@ -29,8 +29,7 @@ func InitApiRouter() *gin.Engine {
 
 	serverGroup := router.Group(fmt.Sprintf("/%s", serverConfig.GetName()))
 	// debug模式下，注册swagger路由
-	// knife4go: beautify swagger-ui http://ip:port/server_name/doc.html
-	// knife4go: beautify swagger-ui,
+	// knife4go: beautify swagger-ui, http://ip:port/server_name/doc.html
 	if serverConfig.IsDebugMode() {
 		_ = knife4go.InitSwaggerKnife(serverGroup)
 	}

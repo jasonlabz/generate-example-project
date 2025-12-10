@@ -410,7 +410,7 @@ function Generate-ProtobufService {
             -ExtraArgs "" `
 	      	-IdlFile $protoFile `
             -GenPath $SERVER_DIR `
-            -UseService $true) {
+			-UseService $true) {
             $successCount++
         }
         else {
