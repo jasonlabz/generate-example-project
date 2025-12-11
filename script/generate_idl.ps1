@@ -45,7 +45,7 @@ function Check-Kitex {
         Write-InfoLog "Installing kitex..."
         try {
             go install github.com/cloudwego/kitex/tool/cmd/kitex@latest
-            
+
             # 安装后重新检查
             $kitexPath = Join-Path $env:GOPATH "bin" "kitex.exe"
             if (Test-Path $kitexPath) {
@@ -87,7 +87,7 @@ function Check-Kitex {
 # 从文件路径提取服务名（不带后缀）
 function Get-ServiceName {
     param([string]$FilePath)
-    
+
     $filename = Split-Path $FilePath -Leaf
     $serviceName = [System.IO.Path]::GetFileNameWithoutExtension($filename)
     return $serviceName
@@ -124,7 +124,7 @@ function Invoke-KitexGeneration {
     }
 
     Write-InfoLog "Generating from: $IdlFile"
-    
+
     # 构建完整的命令
     $fullArgs = @()
     $baseArgs -split ' ' | Where-Object { $_ -ne "" } | ForEach-Object { $fullArgs += $_ }
@@ -143,7 +143,7 @@ function Invoke-KitexGeneration {
         }
     }
     catch {
-        Write-ErrorLog "Failed to generate $Type from $IdlFile: $_"
+        Write-ErrorLog "Failed to generate $Type from $IdlFile, error: $_"
         return $false
     }
 
@@ -465,7 +465,7 @@ function Regenerate-Submodule {
         }
     }
     catch {
-        Write-ErrorLog "Failed to generate for $Path: $_"
+        Write-ErrorLog "Failed to generate for $Path, error: $_"
         Set-Location $originalDir
         return $false
     }
@@ -477,7 +477,7 @@ function Regenerate-Submodule {
         go mod tidy
     }
     catch {
-        Write-WarnLog "Failed to update dependencies for $Path: $_"
+        Write-WarnLog "Failed to update dependencies for $Path, error: $_"
     }
 
     Set-Location $originalDir
