@@ -73,11 +73,11 @@ func main() {
 	}
 
 	go func() {
-		fileServer(serverConfig.GetServerConfig().Static)
+		fileServer(serverConfig)
 	}()
 
 	// start program
-	srv := startServer(r, serverConfig.GetHTTPPort())
+	srv := startServer(r, serverConfig)
 
 	// receive quit signal, ready to exit
 	quit := make(chan os.Signal)
@@ -93,10 +93,12 @@ func main() {
 }
 
 // startServer 自定义http配置
-func startServer(router *gin.Engine, port int) *http.Server {
+func startServer(router *gin.Engine, c *bootstrap.Config) *http.Server {
 	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%d", port),
-		Handler: router,
+		Addr:         fmt.Sprintf(":%d", c.GetHTTPPort()),
+		Handler:      router,
+		ReadTimeout:  c.GetHTTPReadTimeout(),
+		WriteTimeout: c.GetHTTPWriteTimeout(),
 	}
 
 	go func() {
@@ -109,7 +111,8 @@ func startServer(router *gin.Engine, port int) *http.Server {
 }
 
 // fileServer 文件服务
-func fileServer(config bootstrap.StaticConfig) {
+func fileServer(c *bootstrap.Config) {
+	config := c.GetServerConfig().Static
 	// 创建 HTTP 服务器
 	if config.Path == "" {
 		return

@@ -10,7 +10,6 @@ import (
 
 	_ "github.com/jasonlabz/generate-example-project/docs"
 	"github.com/jasonlabz/generate-example-project/server/controller"
-	"github.com/jasonlabz/generate-example-project/server/routers/v1/user"
 )
 
 // InitApiRouter 封装路由
@@ -68,6 +67,5 @@ func registerBaseAPI(router *gin.RouterGroup) {}
 
 // 注册組路由 http://ip:port/server_name/api/v1/**
 func registerV1GroupAPI(router *gin.RouterGroup) {
-	userGroup := router.Group("user")
-	user.RegisterUserGroup(userGroup)
+	// v1.RegisterSchedulerManagerGroup(router)
 }

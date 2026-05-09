@@ -1,50 +1,102 @@
-# 工作目录变量
-WORKDIR := $(shell pwd)
-OUTDIR := $(WORKDIR)/output
+# 工作目录变量（CURDIR 是 make 内置变量，跨平台兼容）
+WORKDIR := $(CURDIR)
+OUTDIR  := $(WORKDIR)/output
 
 # 目标二进制名称
 TARGETNAME = generate-example-project
+ifeq ($(OS),Windows_NT)
+  TARGETNAME = generate-example-project.exe
+  # 针对 Windows cmd.exe，将输出目录的斜杠转换为反斜杠
+  OUTDIR_WIN := $(subst /,\,$(OUTDIR))
+endif
 
-GOPKGS := $$(go list ./.. | grep -vE "vendor")
+# 跨平台获取 Go 包列表 (修正了语法并使用标准写法 ./...)
+GOPKGS := $(shell go list ./...)
 
 # 设置编译时所需要的 Go 环境
 export GOENV = $(WORKDIR)/go.env
 
-#执行编译，可使用命令 make 或 make all 执行， 顺序执行 prepare -> compile -> test -> package 几个阶段
-all: prepare compile test package
+# 执行编译，可使用命令 make 或 make all 执行
+all: clean prepare compile test build frontend copy-frontend package clean-middle docker
 
-# prepare阶段， 下载 Go 依赖，可单独执行命令: make prepare
+# prepare阶段， 下载 Go 依赖
 prepare:
-	git version     # 低于 2.17.1 可能不能正常工作
-	go env          # 打印出 go 环境信息，可用于排查问题
-	go mod download || go mod download -x # 下载 Go 依赖
+	go env
+	go mod download || go mod download -x
 
-# compile 阶段，执行编译命令，可单独执行命令: make compile
-compile:build
+# compile 阶段，执行编译命令
+compile: build
 build: prepare
 	go build -o $(WORKDIR)/bin/$(TARGETNAME)
-	#bash cmd/build.sh
 
-# test 阶段，进行单元测试， 可单独执行命令: make test
-# cover 平台会优先执行此命令
+# test 阶段，进行单元测试
 test: prepare
-	go test -race -timeout=300s -v -cover $(GOPKGS) -coverprofile=coverage.out | tee unittest.txt
+	go test -race -timeout=300s -v -cover $(GOPKGS) -coverprofile=coverage.out
 
-# package 阶段，对编译产出进行打包，输出到 output 目录， 可单独执行命令: make package
+# 前端构建
+frontend:
+	cd web && pnpm install && pnpm build
+
+# 将前端产物复制到 webroot 目录
+ifeq ($(OS),Windows_NT)
+copy-frontend:
+	-if not exist webroot mkdir webroot
+	xcopy /E /I /Y /Q web\dist webroot
+else
+copy-frontend:
+	@mkdir -p webroot
+	cp -r web/dist/* webroot/
+endif
+
+# package 阶段，对编译产出进行打包
+ifeq ($(OS),Windows_NT)
 package:
-	$(shell rm -rf $(OUTDIR))
-	$(shell mkdir -p $(OUTDIR))
-	$(shell mkdir -p $(OUTDIR)/var/)
-	$(shell cp -a bin $(OUTDIR)/bin)
-	$(shell cp -a conf $(OUTDIR)/conf)
-	$(shell if [ -d "data" ]; then cp -r data $(OUTDIR)/data; fi)
-	$(shell if [ -d "script" ]; then cp -r script $(OUTDIR)/script; fi)
-	$(shell if [ -d "webroot" ]; then cp -r webroot $(OUTDIR)/; fi)
-	tree $(OUTDIR)
-
-# clean 阶段，清除过程中的输出， 可单独执行命令: make clean
-clean:
+	-if exist $(OUTDIR_WIN) rmdir /s /q $(OUTDIR_WIN)
+	mkdir $(OUTDIR_WIN)
+	xcopy /E /I /Y /Q bin $(OUTDIR_WIN)\bin
+	xcopy /E /I /Y /Q conf $(OUTDIR_WIN)\conf
+	xcopy /E /I /Y /Q webroot $(OUTDIR_WIN)\webroot
+	-if exist webroot xcopy /E /I /Y /Q webroot $(OUTDIR_WIN)\webroot
+	-if exist data xcopy /E /I /Y /Q data $(OUTDIR_WIN)\data
+	-if exist docs xcopy /E /I /Y /Q docs $(OUTDIR_WIN)\docs
+	-#if exist script xcopy /E /I /Y /Q script $(OUTDIR_WIN)\script
+else
+package:
 	rm -rf $(OUTDIR)
+	cp -a bin $(OUTDIR)/bin
+	cp -a conf $(OUTDIR)/conf
+	cp -a webroot $(OUTDIR)/webroot
+	@if [ -d "webroot" ]; then cp -r webroot $(OUTDIR)/webroot; fi
+	@if [ -d "data" ]; then cp -r data $(OUTDIR)/data; fi
+	@if [ -d "docs" ]; then cp -r docs $(OUTDIR)/docs; fi
+	@#if [ -d "script" ]; then cp -r script $(OUTDIR)/script; fi
+	tree $(OUTDIR) || ls -R $(OUTDIR)
+endif
+
+# Docker 镜像构建
+docker:
+	docker build -t generate-example-project:latest .
+
+# clean 阶段，清除过程中的输出
+ifeq ($(OS),Windows_NT)
+clean:
+	-if exist $(OUTDIR_WIN) rmdir /s /q $(OUTDIR_WIN)
+	-if exist bin rmdir /s /q bin
+	-if exist webroot rmdir /s /q webroot
+else
+clean:
+	rm -rf $(OUTDIR) bin webroot
+endif
+
+# clean middle 阶段，清除过程中的输出
+ifeq ($(OS),Windows_NT)
+clean-middle:
+	-if exist bin rmdir /s /q bin
+	-if exist webroot rmdir /s /q webroot
+else
+clean:
+	rm -rf bin webroot
+endif
 
 # avoid filename conflict and speed up build
-.PHONY: all prepare compile test package  clean build
+.PHONY: all prepare compile test package clean build frontend copy-frontend docker
