@@ -4,10 +4,13 @@ param()
 
 # 配置参数
 $GENTOL_CMD = if ($env:GENTOL_CMD) { $env:GENTOL_CMD } else { "gentol" }
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ProjectRoot = Split-Path -Parent $ScriptDir
+$ConfFile = Join-Path $ProjectRoot "conf" "application.yaml"
+
 $OUTPUT_DIR = if ($env:OUTPUT_DIR) { $env:OUTPUT_DIR } else { "." }
 $TEMPLATE_DIR = if ($env:TEMPLATE_DIR) { $env:TEMPLATE_DIR } else { "./template" }
 $DSN = ""
-# 数据库配置 #TODO: 修改对应参数
 # TODO: 数据库类型  "mysql|postgres|sqlserver|oracle|sqlite|dm"
 $DB_TYPE = "postgres"
 # TODO: 数据库host
@@ -34,7 +37,87 @@ $ONLY_MODEL = if ($env:ONLY_MODEL) { [bool]::Parse($env:ONLY_MODEL) } else { $fa
 $USE_SQL_NULLABLE = if ($env:USE_SQL_NULLABLE) { [bool]::Parse($env:USE_SQL_NULLABLE) } else { $false }
 $RUN_GOFMT = if ($env:RUN_GOFMT) { [bool]::Parse($env:RUN_GOFMT) } else { $true }
 $GEN_HOOK = if ($env:GEN_HOOK) { [bool]::Parse($env:GEN_HOOK) } else { $true }
+# 从 application.yaml 读取 datasource 下的单个字段值
+function Read-YamlValue {
+    param([string]$Key)
 
+    if (-not (Test-Path $ConfFile)) {
+        return ""
+    }
+
+    $inDatasource = $false
+    foreach ($line in Get-Content $ConfFile) {
+        if ($line -match '^datasource:') {
+            $inDatasource = $true
+            continue
+        }
+        if ($inDatasource -and $line -match '^[a-z]') {
+            break
+        }
+        if ($inDatasource -and $line -match "^\s+${Key}:\s*`"?([^`"]*)`"?") {
+            return $Matches[1]
+        }
+    }
+    return ""
+}
+
+# 读取嵌套连接块（masters/replicas）中首个 item 的字段值
+function Read-YamlSubValue {
+    param([string]$Section, [string]$Key)
+
+    if (-not (Test-Path $ConfFile)) { return "" }
+
+    $inSection = $false
+    foreach ($line in Get-Content $ConfFile) {
+        if ($line -match "^  ${Section}:") {
+            $inSection = $true
+            continue
+        }
+        if ($inSection -and $line -match '^[a-z]') {
+            break
+        }
+        if ($inSection -and $line -match "^\s+-*\s*${Key}:\s*`"?([^`"]*)`"?") {
+            return $Matches[1]
+        }
+    }
+    return ""
+}
+
+# 读取连接字段：top-level → masters[0] → replicas[0] 依次回退
+function Read-YamlConnValue {
+    param([string]$Key)
+
+    $val = Read-YamlValue $Key
+    if ($val) { return $val }
+    $val = Read-YamlSubValue "masters" $Key
+    if ($val) { return $val }
+    return Read-YamlSubValue "replicas" $Key
+}
+
+# 从 application.yaml 读取数据库配置（优先于脚本内硬编码值）
+function Load-YamlConfig {
+    if (-not (Test-Path $ConfFile)) {
+        return $false
+    }
+
+    $yamlDbType = Read-YamlValue "db_type"
+    $yamlDbHost = Read-YamlConnValue "host"
+    $yamlDbPort = Read-YamlConnValue "port"
+    $yamlDbUser = Read-YamlConnValue "username"
+    if (-not $yamlDbUser) { $yamlDbUser = Read-YamlConnValue "user" }
+    $yamlDbPass = Read-YamlConnValue "password"
+    $yamlDbName = Read-YamlConnValue "database"
+
+    if ($yamlDbType) { $script:DB_TYPE = $yamlDbType }
+    if ($yamlDbHost) { $script:DB_HOST = $yamlDbHost }
+    if ($yamlDbPort) { $script:DB_PORT = $yamlDbPort }
+    if ($yamlDbUser) { $script:DB_USER = $yamlDbUser }
+    if ($yamlDbPass) { $script:DB_PASS = $yamlDbPass }
+    if ($yamlDbName) { $script:DB_NAME = $yamlDbName }
+
+    Write-InfoLog "已从 application.yaml 读取数据库配置"
+    return $true
+}
 # 日志函数
 function Write-Log {
     param([string]$Message)
@@ -151,6 +234,10 @@ function Main {
     Write-InfoLog "Starting code generation with gentol..."
 
     Check-Gentol
+    $yamlLoaded = Load-YamlConfig
+    if (-not $yamlLoaded) {
+        Write-InfoLog "未找到 application.yaml，使用脚本内配置"
+    }
     Build-Dsn
 
     $args = Build-Args

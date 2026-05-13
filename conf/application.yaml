@@ -19,22 +19,41 @@ application:
       port: 8080
       enabled_endpoints: ["goroutine", "heap"]  # 指定启用的端点
 datasource:
-  enable: true
-  strict: true
+  enable: false
+  strict: false
   db_type: "postgres"
   host: "127.0.0.1"
   port: 5432
   username: postgres
   password: "******"
   database: mydb
+  # Connection 内嵌字段（由于 mapstructure:",squash" 被拍平）
+  dsn: ""
+#  masters:
+#    - dsn: ""
+#      host: ""
+#      port: 0
+#      username: ""
+#      password: ""
+#      database: ""
+#  replicas:
+#    - dsn: ""
+#      host: ""
+#      port: 0
+#      username: ""
+#      password: ""
+#      database: ""
   args:
     - name: sslmode
       value: disable
     - name: TimeZone
       value: Asia/Shanghai
+  charset: ""
   log_mode: "info"
   max_idle_conn: 10
   max_open_conn: 100
+  conn_max_idle_time: 1000
+  conn_max_life_time: 1000
 
 redis:
   enable: false

@@ -7,7 +7,10 @@ GENTOL_CMD="${GENTOL_CMD:-gentol}"
 OUTPUT_DIR="${OUTPUT_DIR:-.}"
 TEMPLATE_DIR="${TEMPLATE_DIR:-./template}"
 DSN=""
-# 数据库配置 #TODO: 修改对应参数
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+CONF_FILE="$PROJECT_ROOT/conf/application.yaml"
+
 # TODO: 数据库类型  "mysql|postgres|sqlserver|oracle|sqlite|dm"
 DB_TYPE="postgres"
 # TODO: 数据库host
@@ -40,6 +43,56 @@ GEN_HOOK="${GEN_HOOK:-true}"
 log() { echo "[$(date '+%H:%M:%S')] $1"; }
 log_info() { log "INFO: $1"; }
 log_error() { log "ERROR: $1"; exit 1; }
+
+# 从 application.yaml 读取 datasource 下的单个字段值
+yaml_val() {
+    sed -n '/^datasource:/,/^[a-z]/p' "$CONF_FILE" 2>/dev/null | \
+        sed -n "s/^  ${1}: *\"\?\([^\"]*\)\"\?/\1/p" | head -1
+}
+
+# 读取嵌套连接块（masters/replicas）中首个 item 的字段值
+yaml_sub_val() {
+    local section="$1"
+    local key="$2"
+    sed -n "/^  ${section}:/,/^[a-z]/p" "$CONF_FILE" 2>/dev/null | \
+        sed -n "s/^[[:space:]]*-* *${key}: *\"\?\([^\"]*\)\"\?/\1/p" | head -1
+}
+
+# 读取连接字段：top-level → masters[0] → replicas[0] 依次回退
+yaml_conn_val() {
+    local key="$1"
+    local val
+    val=$(yaml_val "$key")
+    [[ -n "$val" ]] && echo "$val" && return
+    val=$(yaml_sub_val "masters" "$key")
+    [[ -n "$val" ]] && echo "$val" && return
+    yaml_sub_val "replicas" "$key"
+}
+
+# 从 application.yaml 读取数据库配置（优先于脚本内硬编码值）
+load_yaml_config() {
+    if [[ ! -f "$CONF_FILE" ]]; then
+        return 1
+    fi
+
+    local yaml_db_type;    yaml_db_type=$(yaml_val "db_type")
+    local yaml_db_host;    yaml_db_host=$(yaml_conn_val "host")
+    local yaml_db_port;    yaml_db_port=$(yaml_conn_val "port")
+    local yaml_db_user;    yaml_db_user=$(yaml_conn_val "username")
+    [[ -z "$yaml_db_user" ]] && yaml_db_user=$(yaml_conn_val "user")
+    local yaml_db_pass;    yaml_db_pass=$(yaml_conn_val "password")
+    local yaml_db_name;    yaml_db_name=$(yaml_conn_val "database")
+
+    [[ -n "$yaml_db_type" ]] && DB_TYPE="$yaml_db_type"
+    [[ -n "$yaml_db_host" ]] && DB_HOST="$yaml_db_host"
+    [[ -n "$yaml_db_port" ]] && DB_PORT="$yaml_db_port"
+    [[ -n "$yaml_db_user" ]] && DB_USER="$yaml_db_user"
+    [[ -n "$yaml_db_pass" ]] && DB_PASS="$yaml_db_pass"
+    [[ -n "$yaml_db_name" ]] && DB_NAME="$yaml_db_name"
+
+    log_info "已从 application.yaml 读取数据库配置"
+    return 0
+}
 
 # 构建 DSN（如果未直接提供）
 build_dsn() {
@@ -109,6 +162,7 @@ main() {
     log_info "Starting code generation with gentol..."
 
     check_gentol
+    load_yaml_config || log_info "未找到 application.yaml，使用脚本内配置"
     build_dsn
 
     local args
