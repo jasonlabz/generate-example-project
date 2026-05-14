@@ -4,8 +4,10 @@ set -euo pipefail
 
 # 配置
 SWAG_CMD="${SWAG_CMD:-swag}"
-SWAG_DIR="${SWAG_DIR:-./bin}"
-PROJECT_DIR="${PROJECT_DIR:-.}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+SWAG_DIR="${SWAG_DIR:-$PROJECT_ROOT/bin}"
+PROJECT_DIR="${PROJECT_DIR:-$PROJECT_ROOT}"
 
 # 日志函数
 log() { echo "[$(date '+%H:%M:%S')] $1"; }
@@ -30,11 +32,10 @@ check_swag() {
 # 运行命令
 run_swag() {
     local command="$1"
-    log_info "Running: swag $command"
+    log_info "Running: swag $command (in $PROJECT_DIR)"
 
-    if ! $SWAG_CMD $command; then
-        log_error "swag $command failed"
-    fi
+    # swag init/fmt 必须在项目根目录执行
+    (cd "$PROJECT_DIR" && $SWAG_CMD $command) || log_error "swag $command failed"
 
     log_info "swag $command completed"
 }
@@ -44,7 +45,7 @@ main() {
     log_info "Starting swag documentation generation..."
 
     check_swag || log_error "swag not found and installation failed"
-    run_swag "init"
+    run_swag "init --parseDependency --parseDepth 2"
     run_swag "fmt"
 
     log_info "Documentation generation completed!"

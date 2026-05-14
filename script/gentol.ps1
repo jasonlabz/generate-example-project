@@ -243,12 +243,20 @@ function Main {
     $args = Build-Args
     $command = "$GENTOL_CMD $args"
 
-    Write-InfoLog "Running: $command"
+    Write-InfoLog "Running: $command (in $ProjectRoot)"
 
     try {
-        Invoke-Expression $command
-        if ($LASTEXITCODE -ne 0) {
-            Write-ErrorLog "Code generation failed with exit code: $LASTEXITCODE"
+        # gentol 需要在项目根目录执行（输出路径相对于 CWD）
+        Push-Location $ProjectRoot
+        try {
+            Invoke-Expression $command
+            $exitCode = $LASTEXITCODE
+        }
+        finally {
+            Pop-Location
+        }
+        if ($exitCode -ne 0) {
+            Write-ErrorLog "Code generation failed with exit code: $exitCode"
         }
     }
     catch {

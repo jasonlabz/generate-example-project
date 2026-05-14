@@ -6,10 +6,12 @@ param(
 
 # 配置变量
 $BASE_MODULE = "github.com/jasonlabz/generate-example-project"
-$ROOT_DIR = Get-Location
-$IDL_DIR = "idl"
-$CLIENT_DIR = "client/kitex"
-$SERVER_DIR = "server/kitex"
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ProjectRoot = Split-Path -Parent $ScriptDir
+$ROOT_DIR = $ProjectRoot
+$IDL_DIR = Join-Path $ProjectRoot "idl"
+$CLIENT_DIR = Join-Path $ProjectRoot "client" "kitex"
+$SERVER_DIR = Join-Path $ProjectRoot "server" "kitex"
 
 # 颜色输出函数
 $ESC = [char]27
@@ -133,11 +135,19 @@ function Invoke-KitexGeneration {
     }
     $fullArgs += $IdlFile
 
-    Write-InfoLog "Run command: $KitexCmd $($fullArgs -join ' ')"
+    Write-InfoLog "Run command: $KitexCmd $($fullArgs -join ' ') (in $ProjectRoot)"
 
     try {
-        & $KitexCmd @fullArgs
-        if ($LASTEXITCODE -ne 0) {
+        # kitex 需要在项目根目录执行（查找 go.mod）
+        Push-Location $ProjectRoot
+        try {
+            & $KitexCmd @fullArgs
+            $exitCode = $LASTEXITCODE
+        }
+        finally {
+            Pop-Location
+        }
+        if ($exitCode -ne 0) {
             Write-ErrorLog "Failed to generate $Type from $IdlFile"
             return $false
         }

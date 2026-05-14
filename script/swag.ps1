@@ -3,9 +3,11 @@
 param()
 
 # 配置
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ProjectRoot = Split-Path -Parent $ScriptDir
 $SWAG_CMD = if ($env:SWAG_CMD) { $env:SWAG_CMD } else { "swag" }
-$SWAG_DIR = if ($env:SWAG_DIR) { $env:SWAG_DIR } else { "./bin" }
-$PROJECT_DIR = if ($env:PROJECT_DIR) { $env:PROJECT_DIR } else { "." }
+$SWAG_DIR = if ($env:SWAG_DIR) { $env:SWAG_DIR } else { Join-Path $ProjectRoot "bin" }
+$PROJECT_DIR = if ($env:PROJECT_DIR) { $env:PROJECT_DIR } else { $ProjectRoot }
 
 # 日志函数
 function Write-Log {
@@ -81,15 +83,23 @@ function Check-Swag {
 function Run-Swag {
     param([string]$Command)
 
-    Write-InfoLog "Running: swag $Command"
+    Write-InfoLog "Running: swag $Command (in $PROJECT_DIR)"
 
     try {
         # 分割命令参数
         $arguments = $Command -split ' '
-        & $SWAG_CMD @arguments
+        # swag init/fmt 必须在项目根目录执行
+        Push-Location $PROJECT_DIR
+        try {
+            & $SWAG_CMD @arguments
+            $exitCode = $LASTEXITCODE
+        }
+        finally {
+            Pop-Location
+        }
 
-        if ($LASTEXITCODE -ne 0) {
-            Write-ErrorLog "swag $Command failed with exit code: $LASTEXITCODE"
+        if ($exitCode -ne 0) {
+            Write-ErrorLog "swag $Command failed with exit code: $exitCode"
         }
     }
     catch {
@@ -107,7 +117,7 @@ function Main {
         Write-ErrorLog "swag not found and installation failed"
     }
 
-    Run-Swag "init"
+    Run-Swag "init --parseDependency --parseDepth 2"
     Run-Swag "fmt"
 
     Write-InfoLog "Documentation generation completed!"

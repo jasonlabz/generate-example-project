@@ -5,10 +5,12 @@ set -euo pipefail
 # 配置变量
 KITEX_CMD="${1:-kitex}"
 BASE_MODULE="github.com/jasonlabz/generate-example-project"
-ROOT_DIR=$(pwd)
-IDL_DIR="idl"
-CLIENT_DIR="client/kitex"
-SERVER_DIR="server/kitex"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+ROOT_DIR="$PROJECT_ROOT"
+IDL_DIR="$PROJECT_ROOT/idl"
+CLIENT_DIR="$PROJECT_ROOT/client/kitex"
+SERVER_DIR="$PROJECT_ROOT/server/kitex"
 
 # 颜色输出函数
 RED='\033[0;31m'
@@ -78,12 +80,13 @@ gen_kitex() {
     fi
 
     log_info "Generating from: $idl_file"
-    log_info "Run command: $KITEX_CMD $base_args $extra_args "$idl_file""
+    log_info "Run command: $KITEX_CMD $base_args $extra_args "$idl_file" (in $PROJECT_ROOT)"
 
-    if ! $KITEX_CMD $base_args $extra_args "$idl_file"; then
+    # kitex 需要在项目根目录执行（查找 go.mod）
+    (cd "$PROJECT_ROOT" && $KITEX_CMD $base_args $extra_args "$idl_file") || {
         log_error "Failed to generate $type from $idl_file"
         return 1
-    fi
+    }
 
     log_info "Successfully generated $type from $idl_file"
     return 0
