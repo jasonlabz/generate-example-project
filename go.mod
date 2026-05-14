@@ -6,7 +6,7 @@ require (
 	github.com/gin-gonic/gin v1.12.0
 	github.com/google/uuid v1.6.0
 	github.com/jasonlabz/knife4go v1.0.1-0.20241118142759-6386e3973279
-	github.com/jasonlabz/potato v1.0.10-0.20260512072959-a726855d46ca
+	github.com/jasonlabz/potato v1.0.10-0.20260514055528-aba0ee1f2359
 )
 
 require (
