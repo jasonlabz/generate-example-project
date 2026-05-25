@@ -144,7 +144,8 @@ type ServerConfig struct {
 }
 
 type HTTPConfig struct {
-	Port int `mapstructure:"port" json:"port" yaml:"port" ini:"port"`
+	Enable bool `mapstructure:"enable" json:"enable" yaml:"enable" ini:"enable"`
+	Port   int  `mapstructure:"port" json:"port" yaml:"port" ini:"port"`
 
 	// Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 	// such as "300ms", "3000", "-1.5h" or "2h45m", default unit "ms".
@@ -156,6 +157,7 @@ type HTTPConfig struct {
 }
 
 type StaticConfig struct {
+	Enable   bool   `mapstructure:"enable" json:"enable" yaml:"enable" ini:"enable"`
 	Port     int    `mapstructure:"port" json:"port" yaml:"port" ini:"port"`
 	Path     string `mapstructure:"path" json:"path" yaml:"path" ini:"path"`                 // 静态资源路径
 	Username string `mapstructure:"username" json:"username" yaml:"username" ini:"username"` // 静态资源可以配置auth, 为空则不校验
@@ -163,6 +165,7 @@ type StaticConfig struct {
 }
 
 type GRPCConfig struct {
+	Enable               bool   `mapstructure:"enable" json:"enable" yaml:"enable" ini:"enable"`
 	Port                 int    `mapstructure:"port" json:"port" yaml:"port" ini:"port"`
 	MaxConcurrentStreams uint32 `mapstructure:"max_concurrent_streams" json:"max_concurrent_streams" yaml:"max_concurrent_streams" ini:"max_concurrent_streams"`
 }
@@ -216,7 +219,13 @@ type Config struct {
 	Mongodb     MongodbConf    `mapstructure:"mongodb" json:"mongodb" yaml:"mongodb" ini:"mongodb"`
 }
 
-var applicationConfig = new(Config)
+var applicationConfig = &Config{
+	Application: Application{
+		Server: ServerConfig{
+			HTTP: HTTPConfig{Enable: true},
+		},
+	},
+}
 
 func GetConfig() *Config {
 	return applicationConfig
@@ -224,6 +233,18 @@ func GetConfig() *Config {
 
 func (c *Config) GetServerConfig() ServerConfig {
 	return c.Application.Server
+}
+
+func (c *Config) IsHTTPEnable() bool {
+	return c.Application.Server.HTTP.Enable
+}
+
+func (c *Config) IsGRPCEnable() bool {
+	return c.Application.Server.GRPC.Enable
+}
+
+func (c *Config) IsStaticEnable() bool {
+	return c.Application.Server.Static.Enable
 }
 
 func (c *Config) GetHTTPPort() int {
@@ -249,6 +270,10 @@ func (c *Config) GetPrometheusConfig() PrometheusConfig {
 
 func (c *Config) GetPProfConfig() PProfConfig {
 	return c.Application.Monitor.PProf
+}
+
+func (c *Config) GetStaticConfig() StaticConfig {
+	return c.Application.Server.Static
 }
 
 // GetHTTPReadTimeout 获取超时时间（转换为 time.Duration）
@@ -289,14 +314,22 @@ func (c *Config) Validate() error {
 		return errors.New("application name is required")
 	}
 
-	httpPort := c.GetHTTPPort()
-	if httpPort <= 0 || httpPort > 65535 {
-		return fmt.Errorf("invalid HTTP port: %d", httpPort)
+	if c.IsHTTPEnable() {
+		httpPort := c.GetHTTPPort()
+		if httpPort <= 0 || httpPort > 65535 {
+			return fmt.Errorf("invalid HTTP port: %d", httpPort)
+		}
 	}
 
-	grpcPort := c.GetGRPCPort()
-	if grpcPort <= 0 || grpcPort > 65535 {
-		return fmt.Errorf("invalid GRPC port: %d", grpcPort)
+	if c.IsGRPCEnable() {
+		grpcPort := c.GetGRPCPort()
+		if grpcPort <= 0 || grpcPort > 65535 {
+			return fmt.Errorf("invalid GRPC port: %d", grpcPort)
+		}
+	}
+
+	if c.IsStaticEnable() && c.Application.Server.Static.Path == "" {
+		return errors.New("static.path is required when static.enable=true")
 	}
 
 	return nil

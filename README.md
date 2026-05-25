@@ -1,4 +1,6 @@
 # 工具介绍
+
+> 服务启用规则：`application.server.http.enable` 默认 `true`；`application.server.grpc.enable`、`application.server.static.enable` 默认 `false`，需显式配置为 `true` 才会启动。
 ### 1、 gentol使用
 ```shell
 ## install gentol

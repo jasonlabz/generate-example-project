@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jasonlabz/potato/ginmetrics"
@@ -61,39 +62,52 @@ func main() {
 		m.Use(r)
 	}
 
-	pprofConf := serverConfig.GetPProfConfig()
-	if pprofConf.Enable {
-		r.GET("/debug/pprof/*any", gin.WrapH(http.DefaultServeMux))
-
-		go func() {
-			if err := http.ListenAndServe(fmt.Sprintf(":%d", pprofConf.Port), nil); err != nil {
-				log.Fatalf("pprof server failed: %v", err)
-			}
-		}()
-	}
-
-	go func() {
-		fileServer(serverConfig)
-	}()
+	pprofSrv := startPProfServer(r, serverConfig)
+	fileSrv := startFileServer(serverConfig)
 
 	// start program
-	srv := startServer(r, serverConfig)
+	srv := startHTTPServer(r, serverConfig)
+
+	if srv == nil && pprofSrv == nil && fileSrv == nil {
+		log.Println("no service enabled, exiting")
+		return
+	}
 
 	// receive quit signal, ready to exit
-	quit := make(chan os.Signal)
+	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	<-quit
 	log.Println("Shutdown Server ...")
+	cancel()
 
-	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatal("Server Shutdown:", err)
+	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelShutdown()
+
+	if srv != nil {
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			log.Printf("http server shutdown failed: %v", err)
+		}
+	}
+	if pprofSrv != nil {
+		if err := pprofSrv.Shutdown(shutdownCtx); err != nil {
+			log.Printf("pprof server shutdown failed: %v", err)
+		}
+	}
+	if fileSrv != nil {
+		if err := fileSrv.Shutdown(shutdownCtx); err != nil {
+			log.Printf("file server shutdown failed: %v", err)
+		}
 	}
 	log.Println("Server exiting")
 }
 
-// startServer 自定义http配置
-func startServer(router *gin.Engine, c *bootstrap.Config) *http.Server {
+// startHTTPServer 自定义http配置
+func startHTTPServer(router *gin.Engine, c *bootstrap.Config) *http.Server {
+	if !c.IsHTTPEnable() {
+		return nil
+	}
+
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", c.GetHTTPPort()),
 		Handler:      router,
@@ -110,32 +124,49 @@ func startServer(router *gin.Engine, c *bootstrap.Config) *http.Server {
 	return srv
 }
 
-// fileServer 文件服务
-func fileServer(c *bootstrap.Config) {
-	config := c.GetServerConfig().Static
-	// 创建 HTTP 服务器
-	if config.Path == "" {
-		return
+func startPProfServer(router *gin.Engine, c *bootstrap.Config) *http.Server {
+	pprofConf := c.GetPProfConfig()
+	if !pprofConf.Enable {
+		return nil
 	}
+
+	router.GET("/debug/pprof/*any", gin.WrapH(http.DefaultServeMux))
+	srv := &http.Server{Addr: fmt.Sprintf(":%d", pprofConf.Port), Handler: nil}
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("pprof server failed: %v", err)
+		}
+	}()
+	return srv
+}
+
+// startFileServer 文件服务
+func startFileServer(c *bootstrap.Config) *http.Server {
+	config := c.GetStaticConfig()
+	if !c.IsStaticEnable() || config.Path == "" {
+		return nil
+	}
+
 	mux := http.NewServeMux()
 	mux.Handle("/", http.FileServer(http.Dir(config.Path)))
+
+	var handler http.Handler = mux
 	if config.Username != "" && config.Password != "" {
-		// 使用基本认证保护文件下载路由
-		authMux := basicAuth(mux, config.Username, config.Password)
-		// 启动 HTTP 服务器
-		// log.Printf("Starting file server at :%d", config.GetConfig().Application.Port+1)
-		err := http.ListenAndServe(fmt.Sprintf(":%d", config.Port), authMux)
-		if err != nil {
+		handler = basicAuth(mux, config.Username, config.Password)
+	}
+
+	srv := &http.Server{
+		Addr:    fmt.Sprintf(":%d", config.Port),
+		Handler: handler,
+	}
+
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("file server listen: %s\n", err)
 		}
-		return
-	}
-	// 启动 HTTP 服务器
-	err := http.ListenAndServe(fmt.Sprintf(":%d", config.Port), mux)
-	if err != nil {
-		log.Fatalf("file server listen: %s\n", err)
-	}
-	return
+	}()
+
+	return srv
 }
 
 // basicAuth 认证检查
