@@ -34,7 +34,7 @@ type KafkaConfig struct {
 	Topic            []string `mapstructure:"topic" json:"topic" yaml:"topic" ini:"topic"`
 	Strict           bool     `mapstructure:"strict" json:"strict" yaml:"strict" ini:"strict"`
 	GroupId          string   `mapstructure:"group_id" json:"group_id" yaml:"group_id" ini:"group_id"`
-	BootstrapServers string   `mapstructure:"bootstrap_servers" json:"bootstrap_servers" yaml:"bootstrap_servers" ini:"bootstrap_servers"`
+	BootstrapServers []string `mapstructure:"bootstrap_servers" json:"bootstrap_servers" yaml:"bootstrap_servers" ini:"bootstrap_servers"`
 	SecurityProtocol string   `mapstructure:"security_protocol" json:"security_protocol" yaml:"security_protocol" ini:"security_protocol"`
 	SaslMechanism    string   `mapstructure:"sasl_mechanism" json:"sasl_mechanism" yaml:"sasl_mechanism" ini:"sasl_mechanism"`
 	SaslUsername     string   `mapstructure:"sasl_username" json:"sasl_username" yaml:"sasl_username" ini:"sasl_username"`

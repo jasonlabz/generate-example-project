@@ -136,6 +136,6 @@ obs:
 
 crypto:
   - type: aes
-    key: "your-aes-key-16byte"
+    key: "0123456789abcdef"
   - type: des
     key: "des-key8"
