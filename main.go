@@ -5,12 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jasonlabz/potato/ginmetrics"
@@ -64,11 +68,12 @@ func main() {
 
 	pprofSrv := startPProfServer(r, serverConfig)
 	fileSrv := startFileServer(serverConfig)
+	grpcSrv, grpcLis := startGRPCServer(serverConfig)
 
 	// start program
 	srv := startHTTPServer(r, serverConfig)
 
-	if srv == nil && pprofSrv == nil && fileSrv == nil {
+	if srv == nil && pprofSrv == nil && fileSrv == nil && grpcSrv == nil {
 		log.Println("no service enabled, exiting")
 		return
 	}
@@ -84,9 +89,9 @@ func main() {
 	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelShutdown()
 
-	if srv != nil {
-		if err := srv.Shutdown(shutdownCtx); err != nil {
-			log.Printf("http server shutdown failed: %v", err)
+	if fileSrv != nil {
+		if err := fileSrv.Shutdown(shutdownCtx); err != nil {
+			log.Printf("file server shutdown failed: %v", err)
 		}
 	}
 	if pprofSrv != nil {
@@ -94,10 +99,25 @@ func main() {
 			log.Printf("pprof server shutdown failed: %v", err)
 		}
 	}
-	if fileSrv != nil {
-		if err := fileSrv.Shutdown(shutdownCtx); err != nil {
-			log.Printf("file server shutdown failed: %v", err)
+	if srv != nil {
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			log.Printf("http server shutdown failed: %v", err)
 		}
+	}
+	if grpcSrv != nil {
+		stopDone := make(chan struct{})
+		go func() {
+			grpcSrv.GracefulStop()
+			close(stopDone)
+		}()
+		select {
+		case <-stopDone:
+		case <-shutdownCtx.Done():
+			grpcSrv.Stop()
+		}
+	}
+	if grpcLis != nil {
+		_ = grpcLis.Close()
 	}
 	log.Println("Server exiting")
 }
@@ -138,6 +158,39 @@ func startPProfServer(router *gin.Engine, c *bootstrap.Config) *http.Server {
 		}
 	}()
 	return srv
+}
+
+func startGRPCServer(c *bootstrap.Config) (*grpc.Server, net.Listener) {
+	if !c.IsGRPCEnable() {
+		return nil, nil
+	}
+
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", c.GetGRPCPort()))
+	if err != nil {
+		log.Fatalf("grpc listen failed: %v", err)
+	}
+
+	grpcCfg := c.GetServerConfig().GRPC
+	srv := grpc.NewServer(
+		grpc.KeepaliveParams(keepalive.ServerParameters{
+			MaxConnectionIdle:     300 * time.Second,
+			MaxConnectionAge:      1800 * time.Second,
+			MaxConnectionAgeGrace: 30 * time.Second,
+			Time:                  30 * time.Second,
+			Timeout:               10 * time.Second,
+		}),
+		grpc.MaxConcurrentStreams(grpcCfg.MaxConcurrentStreams),
+	)
+
+	go func() {
+		if serveErr := srv.Serve(lis); serveErr != nil {
+			if !errors.Is(serveErr, net.ErrClosed) {
+				log.Printf("grpc server failed: %v", serveErr)
+			}
+		}
+	}()
+
+	return srv, lis
 }
 
 // startFileServer 文件服务
