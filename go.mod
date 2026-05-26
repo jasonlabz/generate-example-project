@@ -6,7 +6,7 @@ require (
 	github.com/gin-gonic/gin v1.12.0
 	github.com/google/uuid v1.6.0
 	github.com/jasonlabz/knife4go v1.0.1-0.20241118142759-6386e3973279
-	github.com/jasonlabz/potato v1.0.10-0.20260521170024-69be5674ed5a
+	github.com/jasonlabz/potato v1.0.10-0.20260526144952-92b3ea31774d
 	google.golang.org/grpc v1.81.0
 )
 
