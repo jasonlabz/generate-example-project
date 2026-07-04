@@ -8,7 +8,7 @@ import (
 	"github.com/jasonlabz/potato/configx"
 	"github.com/jasonlabz/potato/middleware"
 
-	_ "github.com/jasonlabz/generate-example-project/docs"
+	_ "github.com/jasonlabz/generate-example-project/docs/swagger"
 	"github.com/jasonlabz/generate-example-project/server/controller"
 )
 
