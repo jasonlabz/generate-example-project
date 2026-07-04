@@ -178,10 +178,13 @@ func handleFileDownload(c *gin.Context, version string, config *FileDownloadConf
 	// 处理不同的文件来源
 	if config.Filepath != "" {
 		handleFileDownloadFromPath(c, version, config)
+		return
 	} else if config.Reader != nil {
 		handleFileDownloadFromReader(c, version, config)
+		return
 	} else if config.Content != nil {
 		handleFileDownloadFromContent(c, version, config)
+		return
 	}
 
 	ResponseErr(c, version, errors.New("no file content provided"))
@@ -289,7 +292,7 @@ func getContentType(fileName string) string {
 	}
 
 	// 标准库没有的类型，使用自定义映射
-	ext := strings.ToLower(strings.TrimPrefix(filepath.Ext(fileName), "."))
+	ext := strings.ToLower(filepath.Ext(fileName))
 	switch ext {
 	case ".pdf":
 		return "application/pdf"

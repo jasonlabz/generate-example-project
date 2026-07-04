@@ -42,7 +42,7 @@ WORKDIR /app
 # 后端二进制
 COPY --from=backend-builder /app/bin/generate-example-project ./bin/
 
-# 前端静态文件（从 Stage 1 构建产物复制到 application 目录，由 Go 路由 /server/ 提供）
+# 前端静态文件（从 Stage 1 构建产物复制到 webroot 目录，由 Go 路由 /server/ 提供）
 COPY --from=frontend-builder /app/web/dist ./webroot/
 
 # 配置文件

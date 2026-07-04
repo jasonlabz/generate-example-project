@@ -24,7 +24,7 @@ func InitApiRouter() *gin.Engine {
 
 	// 对路由进行分组，处理不同的分组，根据自己的需求定义即可
 	staticRouter := router.Group("/server")
-	staticRouter.Static("/", "application")
+	staticRouter.Static("/", "webroot")
 
 	serverGroup := router.Group(fmt.Sprintf("/%s", serverConfig.GetName()))
 	// debug模式下，注册swagger路由

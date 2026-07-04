@@ -17,7 +17,7 @@ GOPKGS := $(shell go list ./...)
 export GOENV = $(WORKDIR)/go.env
 
 # 执行编译，可使用命令 make 或 make all 执行
-all: clean prepare compile test build frontend copy-frontend package clean-middle docker
+all: clean test package
 
 # prepare阶段， 下载 Go 依赖
 prepare:
@@ -35,41 +35,36 @@ test: prepare
 
 # 前端构建
 frontend:
-	cd web && pnpm install && pnpm build
+	cd web && pnpm install --frozen-lockfile && pnpm build
 
 # 将前端产物复制到 webroot 目录
 ifeq ($(OS),Windows_NT)
-copy-frontend:
+copy-frontend: frontend
 	-if not exist webroot mkdir webroot
 	xcopy /E /I /Y /Q web\dist webroot
 else
-copy-frontend:
+copy-frontend: frontend
 	@mkdir -p webroot
 	cp -r web/dist/* webroot/
 endif
 
 # package 阶段，对编译产出进行打包
 ifeq ($(OS),Windows_NT)
-package:
+package: build copy-frontend
 	-if exist $(OUTDIR_WIN) rmdir /s /q $(OUTDIR_WIN)
 	mkdir $(OUTDIR_WIN)
 	xcopy /E /I /Y /Q bin $(OUTDIR_WIN)\bin
 	xcopy /E /I /Y /Q conf $(OUTDIR_WIN)\conf
 	xcopy /E /I /Y /Q webroot $(OUTDIR_WIN)\webroot
-	-if exist webroot xcopy /E /I /Y /Q webroot $(OUTDIR_WIN)\webroot
 	-if exist data xcopy /E /I /Y /Q data $(OUTDIR_WIN)\data
-	-if exist docs xcopy /E /I /Y /Q docs $(OUTDIR_WIN)\docs
-	-#if exist script xcopy /E /I /Y /Q script $(OUTDIR_WIN)\script
 else
-package:
+package: build copy-frontend
 	rm -rf $(OUTDIR)
+	mkdir -p $(OUTDIR)
 	cp -a bin $(OUTDIR)/bin
 	cp -a conf $(OUTDIR)/conf
 	cp -a webroot $(OUTDIR)/webroot
-	@if [ -d "webroot" ]; then cp -r webroot $(OUTDIR)/webroot; fi
 	@if [ -d "data" ]; then cp -r data $(OUTDIR)/data; fi
-	@if [ -d "docs" ]; then cp -r docs $(OUTDIR)/docs; fi
-	@#if [ -d "script" ]; then cp -r script $(OUTDIR)/script; fi
 	tree $(OUTDIR) || ls -R $(OUTDIR)
 endif
 
@@ -94,9 +89,9 @@ clean-middle:
 	-if exist bin rmdir /s /q bin
 	-if exist webroot rmdir /s /q webroot
 else
-clean:
+clean-middle:
 	rm -rf bin webroot
 endif
 
 # avoid filename conflict and speed up build
-.PHONY: all prepare compile test package clean build frontend copy-frontend docker
+.PHONY: all prepare compile test package clean clean-middle build frontend copy-frontend docker

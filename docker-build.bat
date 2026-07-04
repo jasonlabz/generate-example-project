@@ -121,12 +121,10 @@ if /i "%PUSH%"=="true" (
 
 echo.
 echo 运行示例:
-echo   docker run -d -p 8080:8080 ^
-echo     -e DB_HOST=host.docker.internal ^
-echo     -e DB_PORT=5432 ^
-echo     -e DB_USER=postgres ^
-echo     -e DB_PASSWORD=your_password ^
-echo     -e DB_NAME=dashboard ^
-echo     %FULL_IMAGE%
+echo   docker run -d -p 8080:8080 %FULL_IMAGE%
+echo.
+echo 访问地址:
+echo   Web:    http://localhost:8080/server/
+echo   Health: http://localhost:8080/health-check
 
 endlocal
