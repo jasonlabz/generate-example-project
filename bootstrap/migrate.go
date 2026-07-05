@@ -170,6 +170,11 @@ func runSeed(ctx context.Context) {
 	}
 
 	db := gormx.DefaultMaster()
+	originLogger := db.Logger
+	db.Logger = db.Logger.LogMode(logger.Error)
+	defer func() {
+		db.Logger = originLogger
+	}()
 	for _, name := range names {
 		path := filepath.Join("conf", "seed", name)
 		content, err := os.ReadFile(path)
