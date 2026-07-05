@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 
 	"github.com/jasonlabz/potato/gormx"
 
@@ -89,8 +90,13 @@ func runMigrations(ctx context.Context) {
 	if !cfg.Enable {
 		return
 	}
-
 	db := gormx.DefaultMaster()
+	originLogger := db.Logger
+	db.Logger = db.Logger.LogMode(logger.Error)
+	defer func() {
+		db.Logger = originLogger
+	}()
+
 	if err := db.Exec(migrationTableSQL).Error; err != nil {
 		resource.Logger.Errorf(ctx, "[migrate] 创建追踪表失败: %v", err)
 		return
@@ -338,6 +344,8 @@ func toGormxConfig(cfg DataSource) *gormx.Config {
 			Database: adminDatabase(cfg.DBType),
 			Args:     args,
 		},
+		LogMode: gormx.LogModeError,
+		Logger:  gormx.LoggerAdapter(resource.Logger.WithCallerSkip(3)),
 	}
 }
 
