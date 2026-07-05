@@ -1,0 +1,16 @@
+-- ============================================================
+-- 基线完整 SQL（00000000_000_baseline.sql）
+-- ============================================================
+-- 约定：
+--   1. 文件名以 00000000_000 开头，确保排序在所有增量文件之前
+--   2. 包含当前全部表结构（CREATE TABLE IF NOT EXISTS）
+--   3. 新数据库首次启动时自动执行此文件，已有记录的库会跳过
+--   4. 后续表结构变更以增量文件形式添加（YYYYMMDD_NNN_desc.sql）
+-- ============================================================
+
+-- 示例：初始表结构
+-- CREATE TABLE IF NOT EXISTS users (
+--     id         BIGSERIAL PRIMARY KEY,
+--     username   VARCHAR(100) NOT NULL,
+--     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+-- );

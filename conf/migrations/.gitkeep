@@ -1,4 +1,0 @@
-# 迁移文件命名规范：YYYYMMDD_NNN_描述.sql
-# 例如：20240701_001_init_tables.sql
-# 系统启动时按文件名排序依次执行，已执行的文件不会重复执行
-# 每个文件的内容为纯 DDL 语句（CREATE TABLE / ALTER TABLE / CREATE INDEX 等）
