@@ -3,7 +3,6 @@ package bootstrap
 import (
 	"bufio"
 	"context"
-	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -44,35 +43,33 @@ type migFile struct {
 // ── 公开入口 ──
 
 // ensureDB 检查目标数据库是否存在，不存在则创建。
+// 通过 gormx.InitConfig 临时连接管理库，用完 Close，不污染全局连接池。
 func ensureDB(ctx context.Context) {
 	cfg := GetConfig().DataSource
 	if !cfg.Enable {
 		return
 	}
 
-	dsn := buildAdminDSN(cfg)
-	if dsn == "" {
-		resource.Logger.Warn(ctx, "[ensureDB] 无法构建管理连接 DSN，跳过")
+	if !isAutoCreateSupported(cfg.DBType) {
+		resource.Logger.Warnf(ctx,
+			"[ensureDB] 数据库类型 %s 不支持自动创建，请手动创建 %s 库后重启",
+			cfg.DBType, cfg.Database)
 		return
 	}
 
-	raw, err := sql.Open(cfg.DBType, dsn)
+	adminCfg := toGormxConfig(cfg)
+	adminDB, err := gormx.InitConfig(adminCfg)
 	if err != nil {
 		resource.Logger.Errorf(ctx, "[ensureDB] 连接服务器失败: %v", err)
 		return
 	}
-	defer raw.Close()
+	defer gormx.Close(adminCfg.DBName)
 
-	ok, err := dbExists(raw, cfg.DBType, cfg.Database)
-	if err != nil {
-		resource.Logger.Errorf(ctx, "[ensureDB] 查询数据库失败: %v", err)
-		return
-	}
-	if ok {
+	if dbExists(adminDB, cfg.DBType, cfg.Database) {
 		return
 	}
 
-	if _, err := raw.Exec(createDBSQL(cfg.DBType, cfg.Database)); err != nil {
+	if err := adminDB.Exec(createDBSQL(cfg.DBType, cfg.Database)).Error; err != nil {
 		resource.Logger.Errorf(ctx, "[ensureDB] 创建数据库失败: %v", err)
 		return
 	}
@@ -323,75 +320,71 @@ func isApplied(db *gorm.DB, version string) (bool, error) {
 
 // ── ensureDB 辅助 ──
 
-func buildAdminDSN(cfg DataSource) string {
-	switch cfg.DBType {
+// toGormxConfig 将 DataSource 转为 gormx.Config，数据库名替换为管理库名。
+// DBName 使用固定值避免与业务连接冲突，用完即 Close。
+func toGormxConfig(cfg DataSource) *gormx.Config {
+	args := make([]gormx.ARG, len(cfg.Args))
+	for i, a := range cfg.Args {
+		args[i] = gormx.ARG{Name: a.Name, Value: a.Value}
+	}
+	return &gormx.Config{
+		DBName: "__ensure_db__",
+		Connection: gormx.Connection{
+			DBType:   gormx.DatabaseType(cfg.DBType),
+			Host:     cfg.Host,
+			Port:     cfg.Port,
+			Username: cfg.Username,
+			Password: cfg.Password,
+			Database: adminDatabase(cfg.DBType),
+			Args:     args,
+		},
+	}
+}
+
+// isAutoCreateSupported 判断数据库类型是否支持自动创建。
+func isAutoCreateSupported(dbType string) bool {
+	switch dbType {
+	case string(gormx.DatabaseTypePostgres),
+		string(gormx.DatabaseTypeMySQL),
+		string(gormx.DatabaseTypeSqlserver):
+		return true
+	}
+	return false
+}
+
+// adminDatabase 返回连接服务器时使用的管理库名。
+// PostgreSQL 连 postgres，SQL Server 连 master，MySQL 不指定库。
+func adminDatabase(dbType string) string {
+	switch dbType {
 	case string(gormx.DatabaseTypePostgres):
-		return buildPGDSN(cfg, "postgres")
-	case string(gormx.DatabaseTypeMySQL):
-		return buildMySQLDSN(cfg, "")
+		return "postgres"
 	case string(gormx.DatabaseTypeSqlserver):
-		return buildMSSQLDSN(cfg, "master")
+		return "master"
 	}
 	return ""
 }
 
-func buildPGDSN(cfg DataSource, db string) string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "user=%s password=%s host=%s port=%d dbname=%s",
-		cfg.Username, cfg.Password, cfg.Host, cfg.Port, db)
-	for _, a := range cfg.Args {
-		fmt.Fprintf(&b, " %s=%s", a.Name, a.Value)
-	}
-	return b.String()
-}
-
-func buildMySQLDSN(cfg DataSource, db string) string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "%s:%s@tcp(%s:%d)/%s",
-		cfg.Username, cfg.Password, cfg.Host, cfg.Port, db)
-	if len(cfg.Args) > 0 {
-		b.WriteByte('?')
-		for i, a := range cfg.Args {
-			if i > 0 {
-				b.WriteByte('&')
-			}
-			fmt.Fprintf(&b, "%s=%s", a.Name, a.Value)
-		}
-	}
-	return b.String()
-}
-
-func buildMSSQLDSN(cfg DataSource, db string) string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "user id=%s;password=%s;server=%s;port=%d;database=%s",
-		cfg.Username, cfg.Password, cfg.Host, cfg.Port, db)
-	for _, a := range cfg.Args {
-		fmt.Fprintf(&b, ";%s=%s", a.Name, a.Value)
-	}
-	return b.String()
-}
-
-func dbExists(raw *sql.DB, dbType, dbName string) (bool, error) {
+// dbExists 通过 GORM 查询目标数据库是否存在。
+func dbExists(db *gorm.DB, dbType, dbName string) bool {
 	q := dbExistsQuery(dbType)
 	if q == "" {
-		return false, nil
+		return false
 	}
 	var n int
-	err := raw.QueryRow(q, dbName).Scan(&n)
-	if err == sql.ErrNoRows {
-		return false, nil
+	if err := db.Raw(q, dbName).Scan(&n).Error; err != nil {
+		return false
 	}
-	return err == nil, err
+	return n > 0
 }
 
 func dbExistsQuery(dbType string) string {
 	switch dbType {
 	case string(gormx.DatabaseTypePostgres):
-		return `SELECT 1 FROM pg_database WHERE datname = $1`
+		return `SELECT 1 FROM pg_database WHERE datname = ?`
 	case string(gormx.DatabaseTypeMySQL):
 		return `SELECT 1 FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?`
 	case string(gormx.DatabaseTypeSqlserver):
-		return `SELECT 1 FROM sys.databases WHERE name = @p1`
+		return `SELECT 1 FROM sys.databases WHERE name = ?`
 	}
 	return ""
 }
