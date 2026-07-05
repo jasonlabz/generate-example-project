@@ -25,15 +25,16 @@ const migrationTableSQL = `CREATE TABLE IF NOT EXISTS schema_migrations (
 )`
 
 const (
-	hdrVersion  = "-- @version " // 版本号声明，如 -- @version 20240701_001
-	hdrBaseline = "-- @baseline" // 基线标记（仅基线文件使用）
+	baselinePrefix = "00000000_000" // 基线文件名前缀，有且仅有一个
+	versionPrefix  = "-- @version " // 推荐版本声明，也支持 --@version
+	versionPrefix2 = "--@version "
 )
 
 // ── 数据结构 ──
 
-// migFile 单个迁移文件的元信息。
-// version 来自文件头部的 -- @version，是迁移追踪的唯一标识。
-// name 是文件名，仅用于日志显示。
+// migFile 迁移文件元信息。
+// version 优先取头部 -- @version，缺失则从文件名前缀 YYYYMMDD_NNN 解析。
+// baseline 由文件名是否以 00000000_000 开头决定。
 type migFile struct {
 	name     string
 	version  string
@@ -43,7 +44,6 @@ type migFile struct {
 // ── 公开入口 ──
 
 // ensureDB 检查目标数据库是否存在，不存在则创建。
-// 使用 database/sql 直连管理库（postgres / mysql / master），不依赖 GORM。
 func ensureDB(ctx context.Context) {
 	cfg := GetConfig().DataSource
 	if !cfg.Enable {
@@ -81,10 +81,11 @@ func ensureDB(ctx context.Context) {
 
 // runMigrations 执行表结构迁移（仅 DDL，不含种子数据）。
 //
-// 版本号统一来自文件头部的 -- @version，不依赖文件名。
+// 版本号优先取头部 -- @version，缺失则从文件名前缀 YYYYMMDD_NNN 解析。
+// 基线由文件名是否以 00000000_000 开头判定，有且仅有一个。
 //
 // 策略：
-//   - 新库（schema_migrations 为空）→ 执行基线 → 跳过版本 ≤ 基线的增量 → 执行剩余增量
+//   - 新库 → 执行基线 → 跳过版本 ≤ 基线版本的增量 → 执行剩余增量
 //   - 已有库 → 只执行版本 > 最新已应用版本的增量
 func runMigrations(ctx context.Context) {
 	cfg := GetConfig().DataSource
@@ -118,7 +119,7 @@ func runMigrations(ctx context.Context) {
 
 	if latest == "" {
 		if baseline == nil {
-			resource.Logger.Error(ctx, "[migrate] 缺少基线文件（头部需包含 -- @baseline）")
+			resource.Logger.Error(ctx, "[migrate] 缺少基线文件（文件名需以 00000000_000 开头）")
 			return
 		}
 		resource.Logger.Infof(ctx, "[migrate] 执行基线 %s (版本 %s)", baseline.name, baseline.version)
@@ -183,19 +184,24 @@ func runSeed(ctx context.Context) {
 
 // ── 文件加载与解析 ──
 
-// loadMigrations 扫描目录、解析头部、按版本号排序。
-// 缺少 -- @version 的文件会被跳过并告警。
+// loadMigrations 扫描目录、解析版本号、按版本排序。
+// 版本号优先取头部 -- @version，缺失从文件名前缀 YYYYMMDD_NNN 解析。
+// 两种方式都拿不到则跳过并告警。
 func loadMigrations(ctx context.Context, dir string) []migFile {
 	names := listSQLFiles(dir)
 	files := make([]migFile, 0, len(names))
 
 	for _, name := range names {
-		mf, err := parseMeta(filepath.Join(dir, name), name)
-		if err != nil {
-			resource.Logger.Warnf(ctx, "[migrate] 跳过 %s: %v", name, err)
+		ver := resolveVersion(filepath.Join(dir, name), name)
+		if ver == "" {
+			resource.Logger.Warnf(ctx, "[migrate] 跳过 %s: 无法解析版本号", name)
 			continue
 		}
-		files = append(files, mf)
+		files = append(files, migFile{
+			name:     name,
+			version:  ver,
+			baseline: strings.HasPrefix(name, baselinePrefix),
+		})
 	}
 
 	sort.Slice(files, func(i, j int) bool {
@@ -204,43 +210,59 @@ func loadMigrations(ctx context.Context, dir string) []migFile {
 	return files
 }
 
-// parseMeta 读取 SQL 文件头部，提取 -- @version 和 -- @baseline。
-// version 是必需字段，缺失则返回 error。
-func parseMeta(path, name string) (migFile, error) {
+// resolveVersion 从文件中解析版本号。
+// 优先读取头部 -- @version / --@version，缺失则从文件名前缀 YYYYMMDD_NNN 提取。
+func resolveVersion(path, name string) string {
+	if v := parseHeaderVersion(path); v != "" {
+		return v
+	}
+	return extractNameVersion(name)
+}
+
+// parseHeaderVersion 读取 SQL 文件前若干行，查找 -- @version xxx 或 --@version xxx。
+func parseHeaderVersion(path string) string {
 	f, err := os.Open(path)
 	if err != nil {
-		return migFile{}, fmt.Errorf("无法打开: %w", err)
+		return ""
 	}
 	defer f.Close()
-
-	mf := migFile{name: name}
 
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
-		if mf.version == "" && strings.HasPrefix(line, hdrVersion) {
-			mf.version = strings.TrimSpace(strings.TrimPrefix(line, hdrVersion))
+		if v, ok := cutVersion(line, versionPrefix); ok {
+			return strings.TrimSpace(v)
 		}
-		if !mf.baseline && line == hdrBaseline {
-			mf.baseline = true
+		if v, ok := cutVersion(line, versionPrefix2); ok {
+			return strings.TrimSpace(v)
 		}
-		// 两个标记都找到了就可以提前退出
-		if mf.version != "" && mf.baseline {
-			break
-		}
-		// 遇到非注释非空行说明头部结束（可选优化）
-		if mf.version != "" && line != "" && !strings.HasPrefix(line, "--") {
+		// 遇到非注释非空行说明头部结束
+		if line != "" && !strings.HasPrefix(line, "--") {
 			break
 		}
 	}
-
-	if mf.version == "" {
-		return migFile{}, fmt.Errorf("缺少 %s 声明", hdrVersion)
-	}
-	return mf, nil
+	return ""
 }
 
-// listSQLFiles 返回目录下所有 .sql 文件名（仅文件名，不含路径），按名称排序。
+func cutVersion(line, prefix string) (string, bool) {
+	if strings.HasPrefix(line, prefix) {
+		return line[len(prefix):], true
+	}
+	return "", false
+}
+
+// extractNameVersion 从文件名前缀提取版本号 YYYYMMDD_NNN。
+// 例如 "20240701_001_add_email.sql" → "20240701_001"。
+func extractNameVersion(name string) string {
+	base := strings.TrimSuffix(name, ".sql")
+	parts := strings.SplitN(base, "_", 3)
+	if len(parts) >= 2 && len(parts[0]) == 8 {
+		return parts[0] + "_" + parts[1]
+	}
+	return ""
+}
+
+// listSQLFiles 返回目录下所有 .sql 文件名（不含路径），按名称排序。
 func listSQLFiles(dir string) []string {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
