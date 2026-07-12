@@ -3,6 +3,8 @@
 set -euo pipefail
 
 GENTOL_CMD="${GENTOL_CMD:-gentol}"
+GENTOL_VERSION="${GENTOL_VERSION:-master}"
+AUTO_INSTALL_TOOLS="${AUTO_INSTALL_TOOLS:-false}"
 DSN="${DSN:-}"
 DB_TYPE="${DB_TYPE:-}"
 DB_HOST="${DB_HOST:-}"
@@ -79,6 +81,7 @@ load_yaml_config() {
     fi
     [[ -z "$DB_PASS" ]] && DB_PASS=$(yaml_conn_val "password")
     [[ -z "$DB_NAME" ]] && DB_NAME=$(yaml_conn_val "database")
+    [[ -z "$DB_SCHEMA" ]] && DB_SCHEMA=$(yaml_conn_val "schema")
 
     log_info "已使用 application.yaml 补齐未设置的数据库配置"
 }
@@ -156,14 +159,24 @@ build_dsn() {
     esac
 }
 
-# 检查 gentol 命令，缺失时沿用模板的自动安装行为。
+# 检查 gentol 命令；安装仍需显式允许，并记录所用版本引用。
 check_gentol() {
     if command -v "$GENTOL_CMD" &>/dev/null; then
         return
     fi
 
-    log_info "Installing gentol..."
-    go install github.com/jasonlabz/gentol@master
+    [[ "$AUTO_INSTALL_TOOLS" == "true" ]] || \
+        log_error "gentol 不存在。请先安装，或设置 AUTO_INSTALL_TOOLS=true；GENTOL_VERSION 默认 master"
+    [[ -n "$GENTOL_VERSION" ]] || log_error "GENTOL_VERSION 不能为空"
+
+    log_info "Installing gentol@$GENTOL_VERSION..."
+    go install "github.com/jasonlabz/gentol@$GENTOL_VERSION"
+    if ! command -v "$GENTOL_CMD" &>/dev/null; then
+        local go_bin
+        go_bin="$(go env GOPATH)/bin/gentol"
+        [[ -x "$go_bin" ]] || log_error "gentol 安装完成但当前 PATH 和 GOPATH/bin 中仍不可用"
+        GENTOL_CMD="$go_bin"
+    fi
 }
 
 # 生成 DAO 和 Model 代码。
@@ -185,7 +198,7 @@ generate_code() {
     [[ "$GEN_HOOK" == "true" ]] && args+=("--gen_hook")
 
     log_info "Starting code generation with gentol..."
-    if ! "$GENTOL_CMD" "${args[@]}"; then
+    if ! (cd "$PROJECT_ROOT" && "$GENTOL_CMD" "${args[@]}"); then
         log_error "Code generation failed"
     fi
     log_info "Code generation completed!"
@@ -194,6 +207,7 @@ generate_code() {
 # 执行指定 DDL 文件。
 execute_ddl() {
     local sql_file="$1"
+    [[ "$sql_file" == /* ]] || sql_file="$PROJECT_ROOT/$sql_file"
     [[ -f "$sql_file" ]] || log_error "SQL文件不存在: $sql_file"
 
     validate_db_config
