@@ -41,7 +41,7 @@ clean_config_value() {
 yaml_val() {
     local value
     value=$(sed -n '/^datasource:/,/^[a-z]/p' "$CONF_FILE" 2>/dev/null | \
-        sed -n "s/^  ${1}: *\"\?\([^\"]*\)\"\?/\1/p" | head -1)
+        sed -n "s/^  ${1}: *\"\{0,1\}\([^\"]*\)\"\{0,1\}/\1/p" | head -1)
     clean_config_value "$value"
 }
 
@@ -51,7 +51,7 @@ yaml_sub_val() {
     local key="$2"
     local value
     value=$(sed -n "/^  ${section}:/,/^[a-z]/p" "$CONF_FILE" 2>/dev/null | \
-        sed -n "s/^[[:space:]]*-* *${key}: *\"\?\([^\"]*\)\"\?/\1/p" | head -1)
+        sed -n "s/^[[:space:]]*-* *${key}: *\"\{0,1\}\([^\"]*\)\"\{0,1\}/\1/p" | head -1)
     clean_config_value "$value"
 }
 
@@ -89,7 +89,7 @@ load_yaml_config() {
 # 从 conf/db/<DB_CONF> 读取并补齐未设置的数据库配置。
 toml_val() {
     local value
-    value=$(sed -n "s/^[[:space:]]*${1}[[:space:]]*=[[:space:]]*\"\?\([^\"]*\)\"\?.*/\1/p" "$TOML_CONF_FILE" 2>/dev/null | head -1)
+    value=$(sed -n "s/^[[:space:]]*${1}[[:space:]]*=[[:space:]]*\"\{0,1\}\([^\"]*\)\"\{0,1\}.*/\1/p" "$TOML_CONF_FILE" 2>/dev/null | head -1)
     clean_config_value "$value"
 }
 
