@@ -15,6 +15,7 @@ import (
 	"github.com/jasonlabz/potato/log"
 	"github.com/jasonlabz/potato/utils"
 
+	"github.com/jasonlabz/generate-example-project/internal/dal/db/dao"
 	"github.com/jasonlabz/generate-example-project/internal/resource"
 )
 
@@ -81,11 +82,11 @@ func initDB(_ context.Context) {
 	gormConfig.DBName = gormx.DefaultDBNameMaster
 	gormConfig.Logger =
 		gormx.LoggerAdapter(resource.Logger.WithCallerSkip(3))
-	_, err = gormx.InitConfig(gormConfig)
+	db, err := gormx.InitConfig(gormConfig)
 	if err != nil {
 		panic(err)
 	}
-	// dao.SetGormDB(db)
+	dao.SetGormDB(db)
 }
 
 func initRMQ(_ context.Context) {

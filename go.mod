@@ -7,7 +7,9 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jasonlabz/knife4go v1.0.1-0.20260712044504-5f8fdbc59309
 	github.com/jasonlabz/potato v1.0.10-0.20260526144952-92b3ea31774d
+	github.com/jasonlabz/sqlite v1.11.1
 	google.golang.org/grpc v1.81.0
+	gorm.io/gorm v1.26.0
 )
 
 require (
@@ -44,8 +46,6 @@ require (
 	github.com/go-openapi/swag/stringutils v0.27.0 // indirect
 	github.com/go-openapi/swag/typeutils v0.27.0 // indirect
 	github.com/go-openapi/swag/yamlutils v0.27.0 // indirect
-	github.com/go-openapi/testify/enable/yaml/v2 v2.6.0 // indirect
-	github.com/go-openapi/testify/v2 v2.6.0 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.30.3 // indirect
@@ -66,7 +66,6 @@ require (
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/jasonlabz/gorm-dm-driver v0.1.5 // indirect
 	github.com/jasonlabz/oracle v1.1.1-0.20240609161033-cf780c860ebb // indirect
-	github.com/jasonlabz/sqlite v1.11.1 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/jolestar/go-commons-pool/v2 v2.1.3-0.20230506141305-ba63d65ee6ca // indirect
@@ -120,7 +119,6 @@ require (
 	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/term v0.45.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	golang.org/x/tools v0.48.0 // indirect
@@ -132,7 +130,6 @@ require (
 	gorm.io/driver/mysql v1.5.7 // indirect
 	gorm.io/driver/postgres v1.5.9 // indirect
 	gorm.io/driver/sqlserver v1.5.3 // indirect
-	gorm.io/gorm v1.26.0 // indirect
 	gorm.io/plugin/dbresolver v1.6.2 // indirect
 	modernc.org/libc v1.22.5 // indirect
 	modernc.org/mathutil v1.5.0 // indirect
