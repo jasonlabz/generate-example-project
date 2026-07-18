@@ -17,8 +17,6 @@ import (
 	"github.com/gin-gonic/gin"
 	errors2 "github.com/jasonlabz/potato/errors"
 	"github.com/jasonlabz/potato/log"
-
-	"github.com/jasonlabz/generate-example-project/internal/resource"
 )
 
 // Response 响应结构体
@@ -108,7 +106,7 @@ func prepareResponse(c *gin.Context, version string, data any, err error) (int, 
 			errMessage = err.Error()
 			errTrace = err.Error()
 		}
-		resource.Logger.Error(c, "        "+errTrace,
+		log.GetLogger().Error(c, "        "+errTrace,
 			log.Int("err_code", errCode), log.String("err_message", errMessage))
 	}
 	// 组装响应结果
@@ -231,7 +229,7 @@ func handleFileDownloadFromPath(c *gin.Context, version string, config *FileDown
 	// 下载后删除文件
 	if config.DeleteAfter {
 		if err = os.Remove(config.Filepath); err != nil {
-			resource.Logger.Error(c, "failed to delete file after download: "+err.Error())
+			log.GetLogger().Error(c, "failed to delete file after download: "+err.Error())
 		}
 	}
 

@@ -7,17 +7,13 @@ import (
 	"github.com/jasonlabz/generate-example-project/internal/service"
 )
 
-var svc *Service
-var once sync.Once
+var (
+	svc  *Service
+	once sync.Once
+)
 
 func GetService() service.HealthCheckService {
-	if svc != nil {
-		return svc
-	}
-	once.Do(func() {
-		svc = &Service{}
-	})
-
+	once.Do(func() { svc = &Service{} })
 	return svc
 }
 

@@ -4,8 +4,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jasonlabz/potato/consts"
 
-	base "github.com/jasonlabz/generate-example-project/pkg/ginx"
 	"github.com/jasonlabz/generate-example-project/internal/service/health_check"
+	base "github.com/jasonlabz/generate-example-project/pkg/ginx"
 )
 
 // HealthCheck 健康检查
