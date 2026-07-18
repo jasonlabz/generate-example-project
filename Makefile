@@ -27,7 +27,7 @@ prepare:
 # compile 阶段，执行编译命令
 compile: build
 build: prepare
-	go build -o $(WORKDIR)/bin/$(TARGETNAME)
+	go build -o $(WORKDIR)/bin/$(TARGETNAME) ./cmd/server
 
 # test 阶段，进行单元测试
 test: prepare

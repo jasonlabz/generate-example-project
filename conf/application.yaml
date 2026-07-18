@@ -22,7 +22,7 @@ application:
       scrape_interval: "15s"  # 添加采集间隔
     pprof:
       enable: false  # Enable PProf tool
-      port: 8080
+      port: 6060
       enabled_endpoints: ["goroutine", "heap"]  # 指定启用的端点
 datasource:
   enable: false
