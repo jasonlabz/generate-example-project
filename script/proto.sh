@@ -3,8 +3,10 @@
 set -euo pipefail
 
 AUTO_INSTALL_TOOLS="${AUTO_INSTALL_TOOLS:-false}"
-PROTOC_GEN_GO_VERSION="${PROTOC_GEN_GO_VERSION:-latest}"
-PROTOC_GEN_GO_GRPC_VERSION="${PROTOC_GEN_GO_GRPC_VERSION:-latest}"
+# protoc-gen-go 默认跟随 go.mod 的 protobuf 版本，保证再生成与提交的生成物一致
+PROTOC_GEN_GO_VERSION="${PROTOC_GEN_GO_VERSION:-$(go list -m -f '{{.Version}}' google.golang.org/protobuf)}"
+# protoc-gen-go-grpc 是独立模块，无法从 go.mod 推导，固定与生成物一致的版本
+PROTOC_GEN_GO_GRPC_VERSION="${PROTOC_GEN_GO_GRPC_VERSION:-v1.6.2}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"

@@ -91,9 +91,21 @@ $env:TABLES = "user,order"
 ./script/gentol.ps1 ddl conf/migrations/20240701_001_example_add_column.sql
 ```
 
-## generate_idl.sh | generate_idl.ps1
+## proto.sh | proto.ps1
 
-解析 IDL 文件并生成 RPC 代码。
+生成 `api/proto` 下所有 `.proto` 文件的 Go 代码（`*.pb.go` / `*_grpc.pb.go`）。生成物与 `.proto` 文件同目录（`paths=source_relative`），并提交入库。
+
+| 操作 | Bash | PowerShell |
+|------|------|------------|
+| 生成 proto 代码 | `bash script/proto.sh` | `./script/proto.ps1` |
+
+前置条件：需已安装 `protoc`（macOS: `brew install protobuf`；Windows: `choco install protoc`）。`protoc-gen-go` / `protoc-gen-go-grpc` 插件缺失时，设置 `AUTO_INSTALL_TOOLS=true` 可自动 `go install`。
+
+| 环境变量 | 说明 | 默认值 |
+|----------|------|--------|
+| `AUTO_INSTALL_TOOLS` | 插件缺失时是否自动安装 | `false` |
+| `PROTOC_GEN_GO_VERSION` | protoc-gen-go 版本 | 跟随 go.mod 的 `google.golang.org/protobuf` 版本 |
+| `PROTOC_GEN_GO_GRPC_VERSION` | protoc-gen-go-grpc 版本 | `v1.6.2` |
 
 ## swag.sh | swag.ps1
 
