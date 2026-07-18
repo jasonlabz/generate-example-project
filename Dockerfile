@@ -23,7 +23,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 
-RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -o bin/generate-example-project .
+RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -o bin/generate-example-project ./cmd/server
 
 # ============================
 # Stage 3: 运行镜像
