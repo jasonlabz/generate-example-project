@@ -2,20 +2,30 @@ package dao
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/jasonlabz/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 
 	"github.com/jasonlabz/generate-example-project/internal/dal/db/model"
 )
 
 func newTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open("file::memory:"), &gorm.Config{})
+	dsn := "file:" + t.Name() + "?mode=memory&cache=shared"
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatalf("get sql db: %v", err)
+	}
+	t.Cleanup(func() { _ = sqlDB.Close() })
 	if err := db.AutoMigrate(&model.User{}); err != nil {
 		t.Fatalf("auto migrate: %v", err)
 	}
@@ -56,7 +66,7 @@ func TestUserDaoCRUD(t *testing.T) {
 	if err := d.DeleteByID(ctx, u.ID); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
-	if _, err = d.SelectByID(ctx, u.ID); err == nil {
-		t.Fatal("expect not found after delete")
+	if _, err = d.SelectByID(ctx, u.ID); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("expect gorm.ErrRecordNotFound after delete, got %v", err)
 	}
 }

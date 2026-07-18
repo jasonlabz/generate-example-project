@@ -17,12 +17,13 @@ type UserDao struct {
 func NewUserDao(db *gorm.DB) *UserDao { return &UserDao{db: db} }
 
 // GetUserDao 返回使用默认装载连接的 UserDao，业务代码使用。
-func GetUserDao() *UserDao { return NewUserDao(defaultDB) }
+func GetUserDao() *UserDao { return NewUserDao(DefaultDB()) }
 
 func (d *UserDao) Insert(ctx context.Context, user *model.User) error {
 	return d.db.WithContext(ctx).Create(user).Error
 }
 
+// SelectByID 按主键查询；未命中返回 gorm.ErrRecordNotFound，调用方用 errors.Is 判断。
 func (d *UserDao) SelectByID(ctx context.Context, id int64) (*model.User, error) {
 	var user model.User
 	if err := d.db.WithContext(ctx).First(&user, id).Error; err != nil {
