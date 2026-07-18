@@ -140,9 +140,8 @@ type LimitConf struct {
 
 // ServerConfig 新增的配置结构体
 type ServerConfig struct {
-	HTTP   HTTPConfig   `mapstructure:"http" json:"http" yaml:"http" ini:"http"`
-	GRPC   GRPCConfig   `mapstructure:"grpc" json:"grpc" yaml:"grpc" ini:"grpc"`
-	Static StaticConfig `mapstructure:"static" json:"static" yaml:"static" ini:"static"`
+	HTTP HTTPConfig `mapstructure:"http" json:"http" yaml:"http" ini:"http"`
+	GRPC GRPCConfig `mapstructure:"grpc" json:"grpc" yaml:"grpc" ini:"grpc"`
 }
 
 type HTTPConfig struct {
@@ -156,14 +155,6 @@ type HTTPConfig struct {
 	// Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 	// such as "300ms", "3000", "-1.5h" or "2h45m", default unit "ms".
 	WriteTimeout string `mapstructure:"write_timeout" json:"write_timeout" yaml:"write_timeout" ini:"write_timeout"`
-}
-
-type StaticConfig struct {
-	Enable   bool   `mapstructure:"enable" json:"enable" yaml:"enable" ini:"enable"`
-	Port     int    `mapstructure:"port" json:"port" yaml:"port" ini:"port"`
-	Path     string `mapstructure:"path" json:"path" yaml:"path" ini:"path"`                 // 静态资源路径
-	Username string `mapstructure:"username" json:"username" yaml:"username" ini:"username"` // 静态资源可以配置auth, 为空则不校验
-	Password string `mapstructure:"password" json:"password" yaml:"password" ini:"password"`
 }
 
 type GRPCConfig struct {
@@ -184,10 +175,9 @@ type PrometheusConfig struct {
 }
 
 type PProfConfig struct {
-	Enable           bool     `mapstructure:"enable" json:"enable" yaml:"enable" ini:"enable"`
-	Port             int      `mapstructure:"port" json:"port" yaml:"port" ini:"port"`
-	EnabledEndpoints []string `mapstructure:"enabled_endpoints" json:"enabled_endpoints" yaml:"enabled_endpoints" ini:"enabled_endpoints"`
-	Pusher           Pusher   `mapstructure:"pusher" json:"pusher" yaml:"pusher" ini:"pusher"` // 推送到 pushgateway
+	Enable bool   `mapstructure:"enable" json:"enable" yaml:"enable" ini:"enable"`
+	Port   int    `mapstructure:"port" json:"port" yaml:"port" ini:"port"`
+	Pusher Pusher `mapstructure:"pusher" json:"pusher" yaml:"pusher" ini:"pusher"` // 推送到 pushgateway
 }
 
 // Pusher push to pushGateway 配置
@@ -245,10 +235,6 @@ func (c *Config) IsGRPCEnable() bool {
 	return c.Application.Server.GRPC.Enable
 }
 
-func (c *Config) IsStaticEnable() bool {
-	return c.Application.Server.Static.Enable
-}
-
 func (c *Config) GetHTTPPort() int {
 	// 优先使用新的 server.http.port 配置
 	if c.Application.Server.HTTP.Port > 0 {
@@ -272,10 +258,6 @@ func (c *Config) GetPrometheusConfig() PrometheusConfig {
 
 func (c *Config) GetPProfConfig() PProfConfig {
 	return c.Application.Monitor.PProf
-}
-
-func (c *Config) GetStaticConfig() StaticConfig {
-	return c.Application.Server.Static
 }
 
 // GetHTTPReadTimeout 获取超时时间（转换为 time.Duration）
@@ -328,10 +310,6 @@ func (c *Config) Validate() error {
 		if grpcPort <= 0 || grpcPort > 65535 {
 			return fmt.Errorf("invalid GRPC port: %d", grpcPort)
 		}
-	}
-
-	if c.IsStaticEnable() && c.Application.Server.Static.Path == "" {
-		return errors.New("static.path is required when static.enable=true")
 	}
 
 	return nil

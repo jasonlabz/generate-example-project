@@ -11,10 +11,6 @@ application:
       enable: false
       port: 8082
       max_concurrent_streams: 100
-    static:
-      enable: false
-      port: 8081
-      path: ""
   monitor:
     prometheus:
       enable: false      # Enable prometheus client
@@ -23,7 +19,6 @@ application:
     pprof:
       enable: false  # Enable PProf tool
       port: 6060
-      enabled_endpoints: ["goroutine", "heap"]  # 指定启用的端点
 datasource:
   enable: false
   strict: false
