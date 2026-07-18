@@ -14,8 +14,8 @@ Timeout: 5000
 Host: 127.0.0.1
 # service 端口
 Port: 8080
-# service basepath
-BasePath: /
+# service basepath（留空即根路径；配 "/" 会与请求路径拼出双斜杠）
+BasePath:
 # 客户端证书, 例如："certs/client.pem"
 CertFile:
 # 客户端证书, 例如："certs/client.key"
