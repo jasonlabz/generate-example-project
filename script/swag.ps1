@@ -17,8 +17,8 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent $ScriptDir
 $SWAG_DIR = if ($env:SWAG_DIR) { $env:SWAG_DIR } else { Join-Path $ProjectRoot "bin" }
 $PROJECT_DIR = if ($env:PROJECT_DIR) { $env:PROJECT_DIR } else { $ProjectRoot }
-$SWAG_OUTPUT_DIR = if ($env:SWAG_OUTPUT_DIR) { $env:SWAG_OUTPUT_DIR } else { "docs" }
-$SWAG_MAIN_FILE = if ($env:SWAG_MAIN_FILE) { $env:SWAG_MAIN_FILE } else { "main.go" }
+$SWAG_OUTPUT_DIR = if ($env:SWAG_OUTPUT_DIR) { $env:SWAG_OUTPUT_DIR } else { "docs/swagger" }
+$SWAG_MAIN_FILE = if ($env:SWAG_MAIN_FILE) { $env:SWAG_MAIN_FILE } else { "cmd/server/main.go" }
 $SWAG_PARSE_DEPTH = if ($env:SWAG_PARSE_DEPTH) { $env:SWAG_PARSE_DEPTH } else { "2" }
 $RUN_SWAG_FMT = if ($env:RUN_SWAG_FMT) { [bool]::Parse($env:RUN_SWAG_FMT) } else { $false }
 

@@ -17,5 +17,5 @@ import (
 //	@Router		/health-check [get]
 func HealthCheck(c *gin.Context) {
 	status := health_check.GetService().DoCheck(c)
-	base.JsonResult(c, consts.APIVersionV1, status, nil)
+	base.JSONResult(c, consts.APIVersionV1, status, nil)
 }

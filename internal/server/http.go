@@ -21,7 +21,7 @@ func buildEngine(c *bootstrap.Config) *gin.Engine {
 	}
 	gin.SetMode(mode)
 
-	engine := router.InitApiRouter()
+	engine := router.InitAPIRouter()
 
 	prometheusConf := c.GetPrometheusConfig()
 	if prometheusConf.Enable {

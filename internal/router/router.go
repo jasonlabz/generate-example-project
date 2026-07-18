@@ -8,12 +8,13 @@ import (
 	"github.com/jasonlabz/potato/configx"
 	"github.com/jasonlabz/potato/middleware"
 
+	// swagger 文档注册（swag 生成的 docs 包通过 init 注入路由信息）
 	_ "github.com/jasonlabz/generate-example-project/docs/swagger"
 	"github.com/jasonlabz/generate-example-project/internal/controller"
 )
 
-// InitApiRouter 封装路由
-func InitApiRouter() *gin.Engine {
+// InitAPIRouter 封装路由
+func InitAPIRouter() *gin.Engine {
 	router := gin.New()
 	serverConfig := configx.GetConfig()
 
@@ -60,9 +61,9 @@ func registerRootAPI(router *gin.Engine) {
 }
 
 // 注册服務路由  http://ip:port/server_name/api/**
-func registerBaseAPI(router *gin.RouterGroup) {}
+func registerBaseAPI(_ *gin.RouterGroup) {}
 
 // 注册組路由 http://ip:port/server_name/api/v1/**
-func registerV1GroupAPI(router *gin.RouterGroup) {
+func registerV1GroupAPI(_ *gin.RouterGroup) {
 	// v1.RegisterSchedulerManagerGroup(router)
 }

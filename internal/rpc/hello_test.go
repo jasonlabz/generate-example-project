@@ -27,7 +27,7 @@ func TestSayHello(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dial: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	resp, err := hellov1.NewHelloServiceClient(conn).SayHello(context.Background(),
 		&hellov1.SayHelloRequest{Name: "gopher"})

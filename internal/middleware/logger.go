@@ -29,7 +29,7 @@ func (bl BodyLog) Header() http.Header {
 }
 
 func (bl BodyLog) Write(b []byte) (int, error) {
-	bl.body.Write(b)
+	_, _ = bl.body.Write(b) // bytes.Buffer 的 Write 永远不会返回错误
 	return bl.ResponseWriter.Write(b)
 }
 

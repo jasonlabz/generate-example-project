@@ -1,0 +1,43 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - revive
+    - depguard
+  settings:
+    revive:
+      enable-default-rules: true
+      rules:
+        - name: exported
+          disabled: true
+        - name: package-comments
+          disabled: true
+    depguard:
+      rules:
+        pkg-no-internal:
+          files:
+            - "**/pkg/**"
+          deny:
+            - pkg: "github.com/jasonlabz/generate-example-project/internal"
+              desc: "pkg 不得依赖 internal，保证可独立复用"
+  exclusions:
+    generated: lax
+    paths:
+      - docs/swagger
+      - api/proto
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/jasonlabz/generate-example-project
+  exclusions:
+    paths:
+      - docs/swagger
+      - api/proto

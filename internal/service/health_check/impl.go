@@ -20,6 +20,6 @@ func GetService() service.HealthCheckService {
 type Service struct {
 }
 
-func (s Service) DoCheck(ctx context.Context) string {
+func (s Service) DoCheck(_ context.Context) string {
 	return "success"
 }

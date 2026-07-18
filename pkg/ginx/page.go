@@ -12,7 +12,6 @@ type Pagination struct {
 
 func (p *Pagination) GetPageCount() {
 	p.PageCount = int64(math.Ceil(float64(p.Total) / float64(p.PageSize)))
-	return
 }
 
 func (p *Pagination) GetOffset() (offset int64) {

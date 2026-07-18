@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+
+	// pprof 性能分析端点注册到 http.DefaultServeMux
 	_ "net/http/pprof"
 
 	"github.com/jasonlabz/generate-example-project/internal/bootstrap"

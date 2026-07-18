@@ -57,8 +57,8 @@ func ResponseErr(c *gin.Context, version string, err error) {
 	c.JSON(prepareResponse(c, version, nil, err))
 }
 
-// JsonResult 返回结果Json
-func JsonResult(c *gin.Context, version string, data any, err error) {
+// JSONResult 返回结果Json
+func JSONResult(c *gin.Context, version string, data any, err error) {
 	c.JSON(prepareResponse(c, version, data, err))
 }
 
@@ -81,8 +81,8 @@ func PaginationResult(c *gin.Context, version string, data any, err error, pagin
 	c.JSON(prepareResponseWithPagination(c, version, data, err, pagination))
 }
 
-// PureJsonResult 返回结果PureJson
-func PureJsonResult(c *gin.Context, version string, data any, err error) {
+// PureJSONResult 返回结果PureJson
+func PureJSONResult(c *gin.Context, version string, data any, err error) {
 	c.PureJSON(prepareResponse(c, version, data, err))
 }
 
@@ -136,7 +136,7 @@ func prepareResponseWithPagination(c *gin.Context, version string,
 // handleData 格式化返回数据，非数组及切片时，转为切片
 func handleData(data any) any {
 	v := reflect.ValueOf(data)
-	if !v.IsValid() || v.Kind() == reflect.Ptr && v.IsNil() {
+	if !v.IsValid() || v.Kind() == reflect.Pointer && v.IsNil() {
 		return make([]any, 0)
 	}
 	if v.Kind() == reflect.Slice || v.Kind() == reflect.Array {
@@ -202,7 +202,7 @@ func handleFileDownloadFromPath(c *gin.Context, version string, config *FileDown
 		ResponseErr(c, version, fmt.Errorf("open file error: %w", err))
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// 获取文件信息
 	fileInfo, err := file.Stat()
@@ -232,8 +232,6 @@ func handleFileDownloadFromPath(c *gin.Context, version string, config *FileDown
 			log.GetLogger().Error(c, "failed to delete file after download: "+err.Error())
 		}
 	}
-
-	return
 }
 
 // handleFileDownloadFromReader 从 Reader 下载
@@ -242,7 +240,6 @@ func handleFileDownloadFromReader(c *gin.Context, version string, config *FileDo
 	if _, err := io.CopyBuffer(c.Writer, config.Reader, make([]byte, config.BufferSize)); err != nil {
 		ResponseErr(c, version, fmt.Errorf("download file error: %w", err))
 	}
-	return
 }
 
 // handleFileDownloadFromContent 从字节内容下载
@@ -254,7 +251,6 @@ func handleFileDownloadFromContent(c *gin.Context, version string, config *FileD
 	if _, err := c.Writer.Write(config.Content); err != nil {
 		ResponseErr(c, version, fmt.Errorf("download file error: %w", err))
 	}
-	return
 }
 
 // getDownloadFilename 处理下载文件名，确保浏览器兼容

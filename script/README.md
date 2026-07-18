@@ -24,8 +24,8 @@
 | `DB_SCHEMA` | 数据库 Schema | 无 |
 | `DB_CONF` | TOML 数据库配置文件名，位于 `conf/db/` | `db.toml` |
 | `TABLES` | 需要生成的表，多个表使用逗号分隔 | 全部表 |
-| `MODEL_DIR` | Model 输出目录 | `dal/db/model` |
-| `DAO_DIR` | DAO 输出目录 | `dal/db/dao` |
+| `MODEL_DIR` | Model 输出目录 | `internal/dal/db/model` |
+| `DAO_DIR` | DAO 输出目录 | `internal/dal/db/dao` |
 | `ONLY_MODEL` | 是否只生成 Model | `false` |
 | `USE_SQL_NULLABLE` | 是否使用 `sql.Null*` 类型 | `false` |
 | `RUN_GOFMT` | 是否执行 gofmt | `true` |

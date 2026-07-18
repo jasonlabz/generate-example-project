@@ -22,8 +22,8 @@ $DB_SCHEMA = if ($env:DB_SCHEMA) { $env:DB_SCHEMA } else { "" }
 $DB_CONF = if ($env:DB_CONF) { $env:DB_CONF } else { "db.toml" }
 $TABLES = if ($env:TABLES) { $env:TABLES } else { "" }
 
-$MODEL_DIR = if ($env:MODEL_DIR) { $env:MODEL_DIR } else { "dal/db/model" }
-$DAO_DIR = if ($env:DAO_DIR) { $env:DAO_DIR } else { "dal/db/dao" }
+$MODEL_DIR = if ($env:MODEL_DIR) { $env:MODEL_DIR } else { "internal/dal/db/model" }
+$DAO_DIR = if ($env:DAO_DIR) { $env:DAO_DIR } else { "internal/dal/db/dao" }
 $ONLY_MODEL = if ($env:ONLY_MODEL) { [bool]::Parse($env:ONLY_MODEL) } else { $false }
 $USE_SQL_NULLABLE = if ($env:USE_SQL_NULLABLE) { [bool]::Parse($env:USE_SQL_NULLABLE) } else { $false }
 $RUN_GOFMT = if ($env:RUN_GOFMT) { [bool]::Parse($env:RUN_GOFMT) } else { $true }
