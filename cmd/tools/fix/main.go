@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/jasonlabz/generate-example-project/bootstrap"
+	"github.com/jasonlabz/generate-example-project/internal/bootstrap"
 )
 
 func main() {

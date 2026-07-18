@@ -1,4 +1,4 @@
-package routers
+package router
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 	"github.com/jasonlabz/potato/middleware"
 
 	_ "github.com/jasonlabz/generate-example-project/docs/swagger"
-	"github.com/jasonlabz/generate-example-project/server/controller"
+	"github.com/jasonlabz/generate-example-project/internal/controller"
 )
 
 // InitApiRouter 封装路由

@@ -14,7 +14,7 @@ import (
 
 	"github.com/jasonlabz/potato/gormx"
 
-	"github.com/jasonlabz/generate-example-project/global/resource"
+	"github.com/jasonlabz/generate-example-project/internal/resource"
 )
 
 // ── 常量 ──

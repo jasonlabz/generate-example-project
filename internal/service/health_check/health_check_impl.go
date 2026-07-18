@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/jasonlabz/generate-example-project/server/service"
+	"github.com/jasonlabz/generate-example-project/internal/service"
 )
 
 var svc *Service

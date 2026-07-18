@@ -18,7 +18,7 @@ import (
 	errors2 "github.com/jasonlabz/potato/errors"
 	"github.com/jasonlabz/potato/log"
 
-	"github.com/jasonlabz/generate-example-project/global/resource"
+	"github.com/jasonlabz/generate-example-project/internal/resource"
 )
 
 // Response 响应结构体

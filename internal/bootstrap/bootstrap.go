@@ -15,7 +15,7 @@ import (
 	"github.com/jasonlabz/potato/log"
 	"github.com/jasonlabz/potato/utils"
 
-	"github.com/jasonlabz/generate-example-project/global/resource"
+	"github.com/jasonlabz/generate-example-project/internal/resource"
 )
 
 func MustInit(ctx context.Context) {

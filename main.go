@@ -19,8 +19,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jasonlabz/potato/ginmetrics"
 
-	"github.com/jasonlabz/generate-example-project/bootstrap"
-	"github.com/jasonlabz/generate-example-project/server/routers"
+	"github.com/jasonlabz/generate-example-project/internal/bootstrap"
+	"github.com/jasonlabz/generate-example-project/internal/router"
 )
 
 // @title		    TODO: ***********服务
@@ -47,7 +47,7 @@ func main() {
 	}
 	gin.SetMode(serverMode)
 
-	r := routers.InitApiRouter()
+	r := router.InitApiRouter()
 
 	prometheusConf := serverConfig.GetPrometheusConfig()
 	if prometheusConf.Enable {
