@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package hello.v1;
+
+option go_package = "github.com/jasonlabz/generate-example-project/api/proto/hello/v1;hellov1";
+
+// HelloService 示例服务：演示 proto 定义 → 生成 → internal/rpc 实现的完整链路。
+service HelloService {
+  rpc SayHello(SayHelloRequest) returns (SayHelloResponse);
+}
+
+message SayHelloRequest {
+  string name = 1;
+}
+
+message SayHelloResponse {
+  string greeting = 1;
+}
