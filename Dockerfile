@@ -15,13 +15,11 @@ RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -o bin/generate-example-p
 # ============================
 # Stage 2: 运行镜像
 # ============================
-FROM debian:bullseye-slim
+FROM alpine:3.23
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates tzdata && \
+RUN apk add --no-cache ca-certificates tzdata && \
     ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
-    echo "Asia/Shanghai" > /etc/timezone && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+    echo "Asia/Shanghai" > /etc/timezone
 
 WORKDIR /app
 
