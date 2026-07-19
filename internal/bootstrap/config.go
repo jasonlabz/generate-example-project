@@ -12,8 +12,7 @@ import (
 )
 
 var confPaths = []string{"./conf/application.yaml", "./conf/server.yaml", "./conf/config.yaml",
-	"./conf/application.ini", "./conf/server.ini", "./conf/config.ini", "./conf/application.ini",
-	"./conf/server.ini", "./conf/config.ini"}
+	"./conf/application.ini", "./conf/server.ini", "./conf/config.ini"}
 
 type CryptoType string
 
