@@ -31,7 +31,7 @@ test: prepare
 	go test -race -timeout=300s -v -cover $(GOPKGS) -coverprofile=coverage.out
 
 lint:
-	golangci-lint run
+	golangci-lint run 2>/dev/null || $$(go env GOPATH)/bin/golangci-lint run
 
 ifeq ($(OS),Windows_NT)
 package: build
