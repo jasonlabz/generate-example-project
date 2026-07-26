@@ -51,14 +51,15 @@ func ensureDB(ctx context.Context) {
 		return
 	}
 
-	if !isAutoCreateSupported(cfg.DBType) {
+	creator, ok := lookupDBCreator(cfg.DBType)
+	if !ok {
 		resource.Logger.Warnf(ctx,
 			"[ensureDB] 数据库类型 %s 不支持自动创建，请手动创建 %s 库后重启",
 			cfg.DBType, cfg.Database)
 		return
 	}
 
-	adminCfg := toGormxConfig(cfg)
+	adminCfg := toGormxConfig(cfg, creator)
 	adminDB, err := gormx.InitConfig(adminCfg)
 	if err != nil {
 		resource.Logger.Errorf(ctx, "[ensureDB] 连接服务器失败: %v", err)
@@ -66,11 +67,11 @@ func ensureDB(ctx context.Context) {
 	}
 	defer gormx.Close(adminCfg.DBName)
 
-	if dbExists(adminDB, cfg.DBType, cfg.Database) {
+	if dbExists(adminDB, creator, cfg.Database) {
 		return
 	}
 
-	if err := adminDB.Exec(createDBSQL(cfg.DBType, cfg.Database)).Error; err != nil {
+	if err := adminDB.Exec(creator.CreateDatabaseSQL(cfg.Database)).Error; err != nil {
 		resource.Logger.Errorf(ctx, "[ensureDB] 创建数据库失败: %v", err)
 		return
 	}
@@ -96,6 +97,13 @@ func runMigrations(ctx context.Context) {
 	defer func() {
 		db.Logger = originLogger
 	}()
+
+	unlock, err := acquireMigrationLock(ctx, db, cfg.DBType)
+	if err != nil {
+		resource.Logger.Errorf(ctx, "[migrate] 获取迁移锁失败: %v", err)
+		return
+	}
+	defer unlock()
 
 	if err := db.Exec(migrationTableSQL).Error; err != nil {
 		resource.Logger.Errorf(ctx, "[migrate] 创建追踪表失败: %v", err)
@@ -289,6 +297,10 @@ func listSQLFiles(dir string) []string {
 // ── 迁移执行 ──
 
 // execFile 在事务中执行迁移文件并记录版本号。
+//
+// 分布式锁已保证同一时刻只有一个实例执行迁移；这里的幂等兜底只覆盖锁保护之外的场景
+// （例如历史遗留、手工误操作导致的结构已存在），命中"对象已存在"类错误时记录警告后
+// 视为已应用，其余错误仍然中断迁移。
 func execFile(db *gorm.DB, mf *migFile) error {
 	path := filepath.Join("conf", "migrations", mf.name)
 	content, err := os.ReadFile(path)
@@ -296,9 +308,15 @@ func execFile(db *gorm.DB, mf *migFile) error {
 		return fmt.Errorf("读取文件: %w", err)
 	}
 
+	dialect, _ := lookupDialect(GetConfig().DataSource.DBType)
+
 	return db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Exec(string(content)).Error; err != nil {
-			return fmt.Errorf("执行SQL: %w", err)
+			if dialect == nil || !dialect.IsIdempotentSkippable(err) {
+				return fmt.Errorf("执行SQL: %w", err)
+			}
+			resource.Logger.Warnf(context.Background(),
+				"[migrate] %s 执行报重复对象错误，视为已应用: %v", mf.name, err)
 		}
 		if err := tx.Exec(
 			`INSERT INTO schema_migrations (version) VALUES (?)`, mf.version,
@@ -333,7 +351,7 @@ func isApplied(db *gorm.DB, version string) (bool, error) {
 
 // toGormxConfig 将 DataSource 转为 gormx.Config，数据库名替换为管理库名。
 // DBName 使用固定值避免与业务连接冲突，用完即 Close。
-func toGormxConfig(cfg DataSource) *gormx.Config {
+func toGormxConfig(cfg DataSource, creator dbCreator) *gormx.Config {
 	args := make([]gormx.ARG, len(cfg.Args))
 	for i, a := range cfg.Args {
 		args[i] = gormx.ARG{Name: a.Name, Value: a.Value}
@@ -346,7 +364,7 @@ func toGormxConfig(cfg DataSource) *gormx.Config {
 			Port:     cfg.Port,
 			Username: cfg.Username,
 			Password: cfg.Password,
-			Database: adminDatabase(cfg.DBType),
+			Database: creator.AdminDatabase(),
 			Args:     args,
 		},
 		LogMode: gormx.LogModeError,
@@ -354,32 +372,9 @@ func toGormxConfig(cfg DataSource) *gormx.Config {
 	}
 }
 
-// isAutoCreateSupported 判断数据库类型是否支持自动创建。
-func isAutoCreateSupported(dbType string) bool {
-	switch dbType {
-	case string(gormx.DatabaseTypePostgres),
-		string(gormx.DatabaseTypeMySQL),
-		string(gormx.DatabaseTypeSqlserver):
-		return true
-	}
-	return false
-}
-
-// adminDatabase 返回连接服务器时使用的管理库名。
-// PostgreSQL 连 postgres，SQL Server 连 master，MySQL 不指定库。
-func adminDatabase(dbType string) string {
-	switch dbType {
-	case string(gormx.DatabaseTypePostgres):
-		return "postgres"
-	case string(gormx.DatabaseTypeSqlserver):
-		return "master"
-	}
-	return ""
-}
-
 // dbExists 通过 GORM 查询目标数据库是否存在。
-func dbExists(db *gorm.DB, dbType, dbName string) bool {
-	q := dbExistsQuery(dbType)
+func dbExists(db *gorm.DB, creator dbCreator, dbName string) bool {
+	q := creator.DBExistsQuery()
 	if q == "" {
 		return false
 	}
@@ -388,28 +383,4 @@ func dbExists(db *gorm.DB, dbType, dbName string) bool {
 		return false
 	}
 	return n > 0
-}
-
-func dbExistsQuery(dbType string) string {
-	switch dbType {
-	case string(gormx.DatabaseTypePostgres):
-		return `SELECT 1 FROM pg_database WHERE datname = ?`
-	case string(gormx.DatabaseTypeMySQL):
-		return `SELECT 1 FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?`
-	case string(gormx.DatabaseTypeSqlserver):
-		return `SELECT 1 FROM sys.databases WHERE name = ?`
-	}
-	return ""
-}
-
-func createDBSQL(dbType, dbName string) string {
-	switch dbType {
-	case string(gormx.DatabaseTypePostgres):
-		return fmt.Sprintf(`CREATE DATABASE "%s"`, dbName)
-	case string(gormx.DatabaseTypeMySQL):
-		return fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s` DEFAULT CHARACTER SET utf8mb4", dbName)
-	case string(gormx.DatabaseTypeSqlserver):
-		return fmt.Sprintf("CREATE DATABASE [%s]", dbName)
-	}
-	return ""
 }
