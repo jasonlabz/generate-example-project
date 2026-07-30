@@ -221,12 +221,26 @@ type Config struct {
 	Mongodb     MongodbConf    `mapstructure:"mongodb" json:"mongodb" yaml:"mongodb" ini:"mongodb"`
 }
 
-var applicationConfig = &Config{
-	Application: Application{
-		Server: ServerConfig{
-			HTTP: HTTPConfig{Enable: true},
+var applicationConfig = defaultConfig()
+
+func defaultConfig() *Config {
+	return &Config{
+		Application: Application{
+			Server: ServerConfig{
+				HTTP: HTTPConfig{Enable: true},
+			},
 		},
-	},
+		DataSource: DataSource{
+			Enable:  true,
+			DBType:  "sqlite",
+			LogMode: "info",
+			Connection: Connection{
+				DSN: "file::memory:?cache=shared",
+			},
+			MaxIdleConn: 1,
+			MaxOpenConn: 1,
+		},
+	}
 }
 
 func GetConfig() *Config {

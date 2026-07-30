@@ -47,7 +47,7 @@ type migFile struct {
 // 通过 gormx.InitConfig 临时连接管理库，用完 Close，不污染全局连接池。
 func ensureDB(ctx context.Context) {
 	cfg := GetConfig().DataSource
-	if !cfg.Enable {
+	if !cfg.Enable || cfg.DBType == string(gormx.DatabaseTypeSQLite) {
 		return
 	}
 
@@ -91,12 +91,7 @@ func runMigrations(ctx context.Context) {
 	if !cfg.Enable {
 		return
 	}
-	db := gormx.DefaultMaster()
-	originLogger := db.Logger
-	db.Logger = db.Logger.LogMode(logger.Error)
-	defer func() {
-		db.Logger = originLogger
-	}()
+	db := withErrorLogger(gormx.DefaultMaster())
 
 	unlock, err := acquireMigrationLock(ctx, db, cfg.DBType)
 	if err != nil {
@@ -177,12 +172,7 @@ func runSeed(ctx context.Context) {
 		return
 	}
 
-	db := gormx.DefaultMaster()
-	originLogger := db.Logger
-	db.Logger = db.Logger.LogMode(logger.Error)
-	defer func() {
-		db.Logger = originLogger
-	}()
+	db := withErrorLogger(gormx.DefaultMaster())
 	for _, name := range names {
 		path := filepath.Join("conf", "seed", name)
 		content, err := os.ReadFile(path)
@@ -345,6 +335,10 @@ func isApplied(db *gorm.DB, version string) (bool, error) {
 		`SELECT COUNT(1) FROM schema_migrations WHERE version = ?`, version,
 	).Scan(&n).Error
 	return n > 0, err
+}
+
+func withErrorLogger(db *gorm.DB) *gorm.DB {
+	return db.Session(&gorm.Session{Logger: db.Logger.LogMode(logger.Error)})
 }
 
 // ── ensureDB 辅助 ──

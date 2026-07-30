@@ -207,7 +207,7 @@ const migrationLockKey = "generate-example-project:schema-migrations"
 // acquireMigrationLock 尝试获取迁移分布式锁。
 //
 // 返回的 unlock 函数总是非 nil，可安全 defer 调用；若当前数据库类型未注册方言（如
-// oracle/sqlite），unlock 为空操作，并在日志中提示多实例部署时需自行保证串行执行。
+// oracle），unlock 为空操作，并在日志中提示多实例部署时需自行保证串行执行。
 func acquireMigrationLock(ctx context.Context, db *gorm.DB, dbType string) (unlock func(), err error) {
 	dialect, ok := lookupDialect(dbType)
 	if !ok {

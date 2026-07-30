@@ -35,9 +35,10 @@ var dialectRegistry = map[gormx.DatabaseType]migrateDialect{
 	gormx.DatabaseTypeMySQL:     mysqlDialect{},
 	gormx.DatabaseTypeSqlserver: sqlserverDialect{},
 	gormx.DatabaseTypeDM:        dmDialect{},
+	gormx.DatabaseTypeSQLite:    sqliteDialect{},
 }
 
-// lookupDialect 按数据库类型查找迁移方言实现；未注册的类型（如 oracle/sqlite）返回 ok=false。
+// lookupDialect 按数据库类型查找迁移方言实现；未注册的类型（如 oracle）返回 ok=false。
 func lookupDialect(dbType string) (migrateDialect, bool) {
 	d, ok := dialectRegistry[gormx.DatabaseType(dbType)]
 	return d, ok
@@ -170,6 +171,29 @@ func (dmDialect) IsIdempotentSkippable(err error) bool {
 	// -2005 表或视图已存在；达梦错误信息也可能直接包含中英文提示
 	for _, kw := range []string{"-2005", "already exists", "已存在"} {
 		if strings.Contains(msg, kw) {
+			return true
+		}
+	}
+	return false
+}
+
+// ── SQLite ──
+
+// sqliteDialect 使用锁表协调共享 SQLite 数据库中的并发迁移。
+// 内存数据库仅在单进程内共享，文件数据库也可以复用同一机制。
+type sqliteDialect struct{}
+
+func (sqliteDialect) Locker(db *gorm.DB, lockKey string) migrateLocker {
+	return newTableLocker(db, lockKey)
+}
+
+func (sqliteDialect) IsIdempotentSkippable(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	for _, keyword := range []string{"already exists", "duplicate column name"} {
+		if strings.Contains(msg, keyword) {
 			return true
 		}
 	}
