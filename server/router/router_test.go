@@ -7,6 +7,12 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/danielgtaylor/huma/v2"
+	"github.com/danielgtaylor/huma/v2/adapters/humagin"
+	"github.com/gin-gonic/gin"
+	"github.com/jasonlabz/generate-example-project/server/mocks"
+	"go.uber.org/mock/gomock"
 )
 
 // newTestAPIRouter builds an isolated router without reading global configuration.
@@ -114,4 +120,18 @@ func TestNewAPIRouter_ProductionHidesOpenAPIDocument(t *testing.T) {
 	if recorder.Code != http.StatusNotFound {
 		t.Errorf("GET /example/v3/api-docs status = %d, want %d", recorder.Code, http.StatusNotFound)
 	}
+}
+
+func TestRegisterRootAPI_DelegatesToHealthCheckController(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	config := huma.DefaultConfig("test", "v1")
+	config.CreateHooks = nil
+	api := humagin.New(router, config)
+
+	mockController := gomock.NewController(t)
+	healthCheckController := mocks.NewMockHealthCheckController(mockController)
+	healthCheckController.EXPECT().Register(gomock.Any())
+
+	registerRootAPI(api, healthCheckController)
 }

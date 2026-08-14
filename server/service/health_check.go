@@ -2,6 +2,7 @@ package service
 
 import "context"
 
+// HealthCheckService performs the application health check.
 type HealthCheckService interface {
-	DoCheck(ctx context.Context) string
+	Check(ctx context.Context) error
 }

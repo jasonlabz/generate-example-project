@@ -10,6 +10,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jasonlabz/knife4go v1.0.1-0.20260712044504-5f8fdbc59309
 	github.com/jasonlabz/potato v1.0.10-0.20260526144952-92b3ea31774d
+	go.uber.org/mock v0.6.0
 	google.golang.org/grpc v1.81.0
 	gorm.io/gorm v1.26.0
 )

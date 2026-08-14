@@ -11,6 +11,8 @@ import (
 	"github.com/jasonlabz/potato/middleware"
 
 	"github.com/jasonlabz/generate-example-project/server/controller"
+	health_check_manager "github.com/jasonlabz/generate-example-project/server/manager/health_check"
+	health_check_service "github.com/jasonlabz/generate-example-project/server/service/health_check"
 )
 
 // InitApiRouter creates the API router from the global server configuration.
@@ -33,7 +35,7 @@ func newAPIRouter(serviceName string, debug bool) (*gin.Engine, error) {
 	// Disable schema links to preserve the existing HTTP response contract.
 	humaConfig.CreateHooks = nil
 	api := humagin.New(router, humaConfig)
-	registerRootAPI(api)
+	registerRootAPI(api, newHealthCheckController())
 
 	// 对路由进行分组，处理不同的分组，根据自己的需求定义即可
 	staticRouter := router.Group("/server")
@@ -73,9 +75,18 @@ func groupMiddleware(g *gin.RouterGroup, middlewares ...gin.HandlerFunc) {
 	g.Use(middlewares...)
 }
 
+// newHealthCheckController assembles the local health-check dependency graph.
+func newHealthCheckController() controller.HealthCheckController {
+	probe := health_check_manager.NewLocalProbe()
+	manager := health_check_manager.NewManager(probe)
+	service := health_check_service.NewService(manager)
+
+	return controller.NewHealthCheckController(service)
+}
+
 // registerRootAPI registers routes served from the root API.
-func registerRootAPI(api huma.API) {
-	controller.RegisterHealthCheck(api)
+func registerRootAPI(api huma.API, healthCheckController controller.HealthCheckController) {
+	healthCheckController.Register(api)
 }
 
 // 注册服務路由  http://ip:port/server_name/api/**

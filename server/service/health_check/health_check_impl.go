@@ -1,29 +1,31 @@
+// Package health_check implements the health-check service.
 package health_check
 
 import (
 	"context"
-	"sync"
+	"fmt"
 
+	"github.com/jasonlabz/generate-example-project/server/manager"
 	"github.com/jasonlabz/generate-example-project/server/service"
 )
 
-var svc *Service
-var once sync.Once
-
-func GetService() service.HealthCheckService {
-	if svc != nil {
-		return svc
-	}
-	once.Do(func() {
-		svc = &Service{}
-	})
-
-	return svc
-}
-
+// Service applies the application policy for the health check.
 type Service struct {
+	manager manager.HealthCheckManager
 }
 
-func (s Service) DoCheck(ctx context.Context) string {
-	return "success"
+var _ service.HealthCheckService = (*Service)(nil)
+
+// NewService creates a HealthCheckService backed by manager.
+func NewService(manager manager.HealthCheckManager) service.HealthCheckService {
+	return &Service{manager: manager}
+}
+
+// Check reports a manager failure with service-level context.
+func (s *Service) Check(ctx context.Context) error {
+	if err := s.manager.Check(ctx); err != nil {
+		return fmt.Errorf("check health: %w", err)
+	}
+
+	return nil
 }
