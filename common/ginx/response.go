@@ -12,12 +12,12 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	errors2 "github.com/jasonlabz/potato/errors"
 	"github.com/jasonlabz/potato/log"
 
+	"github.com/jasonlabz/generate-example-project/common/response"
 	"github.com/jasonlabz/generate-example-project/global/resource"
 )
 
@@ -112,13 +112,14 @@ func prepareResponse(c *gin.Context, version string, data any, err error) (int, 
 			log.Int("err_code", errCode), log.String("err_message", errMessage))
 	}
 	// 组装响应结果
+	envelope := response.NewError(version, data, errCode, errMessage, errTrace)
 	resp := &Response{
-		Code:        errCode,
-		Message:     errMessage,
-		ErrTrace:    errTrace,
-		Version:     version,
-		Data:        data,
-		CurrentTime: time.Now().Format(time.DateTime),
+		Code:        envelope.Code,
+		Message:     envelope.Message,
+		ErrTrace:    envelope.ErrTrace,
+		Version:     envelope.Version,
+		Data:        envelope.Data,
+		CurrentTime: envelope.CurrentTime,
 	}
 	return code, resp
 }
