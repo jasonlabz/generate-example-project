@@ -29,6 +29,26 @@ func TestNewAPIRouter_HealthCheck(t *testing.T) {
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("GET /health-check status = %d, want %d", recorder.Code, http.StatusOK)
 	}
+	if link := recorder.Header().Get("Link"); link != "" {
+		t.Errorf("GET /health-check Link header = %q, want empty", link)
+	}
+
+	var rawResponse map[string]json.RawMessage
+	if err := json.Unmarshal(recorder.Body.Bytes(), &rawResponse); err != nil {
+		t.Fatalf("GET /health-check response is not JSON: %v", err)
+	}
+	if _, ok := rawResponse["$schema"]; ok {
+		t.Error("GET /health-check response contains unexpected $schema field")
+	}
+	wantKeys := []string{"code", "version", "current_time", "data"}
+	if len(rawResponse) != len(wantKeys) {
+		t.Errorf("GET /health-check top-level key count = %d, want %d", len(rawResponse), len(wantKeys))
+	}
+	for _, key := range wantKeys {
+		if _, ok := rawResponse[key]; !ok {
+			t.Errorf("GET /health-check response is missing top-level key %q", key)
+		}
+	}
 
 	var response struct {
 		Code        int      `json:"code"`

@@ -30,6 +30,8 @@ func newAPIRouter(serviceName string, debug bool) (*gin.Engine, error) {
 	humaConfig.DocsPath = ""
 	humaConfig.OpenAPIPath = ""
 	humaConfig.SchemasPath = ""
+	// Disable schema links to preserve the existing HTTP response contract.
+	humaConfig.CreateHooks = nil
 	api := humagin.New(router, humaConfig)
 	registerRootAPI(api)
 
