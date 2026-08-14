@@ -3,34 +3,48 @@ package router
 import (
 	"fmt"
 
+	"github.com/danielgtaylor/huma/v2"
+	"github.com/danielgtaylor/huma/v2/adapters/humagin"
 	"github.com/gin-gonic/gin"
-	knife4go "github.com/jasonlabz/knife4go"
+	knife "github.com/jasonlabz/knife4go"
 	"github.com/jasonlabz/potato/configx"
 	"github.com/jasonlabz/potato/middleware"
 
-	_ "github.com/jasonlabz/generate-example-project/docs/swagger"
 	"github.com/jasonlabz/generate-example-project/server/controller"
 )
 
-// InitApiRouter 封装路由
-func InitApiRouter() *gin.Engine {
-	router := gin.New()
+// InitApiRouter creates the API router from the global server configuration.
+func InitApiRouter() (*gin.Engine, error) {
 	serverConfig := configx.GetConfig()
+	return newAPIRouter(serverConfig.GetName(), serverConfig.IsDebugMode())
+}
+
+// newAPIRouter creates an API router from deterministic inputs.
+func newAPIRouter(serviceName string, debug bool) (*gin.Engine, error) {
+	router := gin.New()
 
 	// 全局中间件，查看定义的中间价在middlewares文件夹中
 	rootMiddleware(router)
 
-	registerRootAPI(router)
+	humaConfig := huma.DefaultConfig(serviceName, "v1")
+	humaConfig.DocsPath = ""
+	humaConfig.OpenAPIPath = ""
+	humaConfig.SchemasPath = ""
+	api := humagin.New(router, humaConfig)
+	registerRootAPI(api)
 
 	// 对路由进行分组，处理不同的分组，根据自己的需求定义即可
 	staticRouter := router.Group("/server")
 	staticRouter.Static("/", "webroot")
 
-	serverGroup := router.Group(fmt.Sprintf("/%s", serverConfig.GetName()))
-	// debug模式下，注册swagger路由
-	// knife4go: beautify swagger-ui, http://ip:port/server_name/doc.html
-	if serverConfig.IsDebugMode() {
-		_ = knife4go.InitSwaggerKnife(serverGroup)
+	serverGroup := router.Group(fmt.Sprintf("/%s", serviceName))
+	// Knife4go must observe the completed Huma document when it registers debug routes.
+	if debug {
+		if err := knife.Init(serverGroup, knife.DocumentProviderFunc(func() ([]byte, error) {
+			return api.OpenAPI().Downgrade()
+		})); err != nil {
+			return nil, fmt.Errorf("initialize knife4go documentation: %w", err)
+		}
 	}
 
 	// base api
@@ -46,7 +60,7 @@ func InitApiRouter() *gin.Engine {
 	v1Group := apiGroup.Group("/v1")
 	registerV1GroupAPI(v1Group)
 
-	return router
+	return router, nil
 }
 
 func rootMiddleware(r *gin.Engine, middlewares ...gin.HandlerFunc) {
@@ -57,9 +71,9 @@ func groupMiddleware(g *gin.RouterGroup, middlewares ...gin.HandlerFunc) {
 	g.Use(middlewares...)
 }
 
-// 注册根路由  http://ip:port/**
-func registerRootAPI(router *gin.Engine) {
-	router.GET("/health-check", controller.HealthCheck)
+// registerRootAPI registers routes served from the root API.
+func registerRootAPI(api huma.API) {
+	controller.RegisterHealthCheck(api)
 }
 
 // 注册服務路由  http://ip:port/server_name/api/**

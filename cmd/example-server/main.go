@@ -23,14 +23,6 @@ import (
 	"github.com/jasonlabz/generate-example-project/server/router"
 )
 
-// @title		    TODO: ***********服务
-// @version		    1.0
-// @description	    TODO: 旨在***********
-// @host			TODO: localhost:port
-// @contact.name	TODO: your name
-// @contact.url	    TODO: http://www.*****.io/support
-// @contact.email	TODO: mail_name@qq.com
-// @BasePath		TODO: /base_path
 func main() {
 	// context
 	ctx, cancel := context.WithCancel(context.Background())
@@ -47,7 +39,10 @@ func main() {
 	}
 	gin.SetMode(serverMode)
 
-	r := router.InitApiRouter()
+	r, err := router.InitApiRouter()
+	if err != nil {
+		log.Fatalf("initialize API router: %v", err)
+	}
 
 	prometheusConf := serverConfig.GetPrometheusConfig()
 	if prometheusConf.Enable {
