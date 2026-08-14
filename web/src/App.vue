@@ -5,7 +5,7 @@ type HealthState = 'checking' | 'online' | 'offline'
 
 const serviceName = 'generate-example-project'
 const apiBasePath = `/${serviceName}/api/v1`
-const swaggerPath = `/${serviceName}/doc.html`
+const documentationPath = `/${serviceName}/doc.html`
 const healthText = ref('Checking service status')
 const healthState = ref<HealthState>('checking')
 
@@ -57,9 +57,9 @@ onMounted(async () => {
         <span class="tile-label">Health</span>
         <strong>/health-check</strong>
       </a>
-      <a class="link-tile" :href="swaggerPath">
-        <span class="tile-label">Swagger</span>
-        <strong>{{ swaggerPath }}</strong>
+      <a class="link-tile" :href="documentationPath">
+        <span class="tile-label">API Documentation</span>
+        <strong>{{ documentationPath }}</strong>
       </a>
       <div class="link-tile">
         <span class="tile-label">API Base</span>

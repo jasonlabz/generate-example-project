@@ -27,55 +27,8 @@ bash script/gentol.sh ddl conf/migrations/20240701_001_example_add_column.sql
 
 PowerShell 使用 `./script/gentol.ps1` 和 `./script/gentol.ps1 ddl <sql文件>`。完整环境变量和参数说明见 [script/README.md](script/README.md)。
 
-### 2、swagger使用
-```shell
-## swagger 依赖
-go get "github.com/swaggo/files"
-go get "github.com/swaggo/gin-swagger"
+### 2、API 文档
 
+项目使用 Huma 生成 OpenAPI 3.0 文档，并使用 Knife4go 提供文档 UI。无需安装或运行额外的文档生成命令。
 
-## swagger 命令行工具
-go install github.com/swaggo/swag/cmd/swag@v1.8.12
-
-###注释文档 main函数
-// @title 这里写标题
-// @version 这里写版本号
-// @description 这里写描述信息
-// @termsOfService http://swagger.io/terms/
-
-// @contact.name 这里写联系人信息
-// @contact.url http://www.swagger.io/support
-// @contact.email support@swagger.io
-
-// @license.name Apache 2.0
-// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
-
-// @host 这里写接口服务的host
-// @BasePath 这里写base path（eg：/api/v1）
-func main() {}
-
-### 接口层 controller
-// @Summary 升级版帖子列表接口
-// @Description 可按社区按时间或分数排序查询帖子列表接口
-// @Tags 帖子相关接口
-// @Accept application/json
-// @Produce application/json
-// @Param Authorization header string false "Bearer 用户令牌"
-// @Param object query models.ParamArtList(请求参数结构体) false "查询参数"
-// @Security ApiKeyAuth
-// @Success 200 {object} _ResponseArtList
-// @Router /接口路由 [请求类型]
-func GetArt(c *gin.Context) {}
-
-### 结构体 struct
-// 文章列表接口数据信息
-type _ResponseArticle struct {
-	Code    int               `json:"code"` // 业务状态码
-	Message string            `json:"message"` // 提示信息
-	Data    *[]model.Article  `json:"data"` // 数据
-}
-
-### 生成文档，执行：
-swag init
-}
-```
+调试模式下，文档 UI 位于 `/{service}/doc.html`，生成的 OpenAPI 3.0 文档位于 `/{service}/v3/api-docs`。

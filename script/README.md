@@ -95,6 +95,8 @@ $env:TABLES = "user,order"
 
 解析 IDL 文件并生成 RPC 代码。
 
-## swag.sh | swag.ps1
+## API 文档
 
-解析注释并生成 Swagger 文档。
+项目使用 Huma 生成 OpenAPI 3.0 文档，并使用 Knife4go 提供文档 UI，无需运行文档生成脚本。
+
+调试模式下，文档 UI 位于 `/{service}/doc.html`，生成的 OpenAPI 3.0 文档位于 `/{service}/v3/api-docs`。
