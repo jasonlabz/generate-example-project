@@ -268,6 +268,7 @@ github.com/jackc/puddle/v2 v2.2.2 h1:PR8nw+E/1w0GLuRFSmiioY6UooMp6KJv0/61nB7icHo
 github.com/jackc/puddle/v2 v2.2.2/go.mod h1:vriiEXHvEE654aYKXXjOvZM39qJ0q+azkZFrfEOc3H4=
 github.com/jasonlabz/gorm-dm-driver v0.1.5 h1:xqjlnUzmR1vH/njSGBJffJ4Wn+xsWBHL22896EgbNcI=
 github.com/jasonlabz/gorm-dm-driver v0.1.5/go.mod h1:JGj8wDQ0iwe7+ouh/jAjh5bn1mwo532lrxdhLlzDneE=
+github.com/jasonlabz/knife4go v1.0.1-0.20260814173510-ca6aa81e95f1 h1:SlOqCPjt1EOBpIdjel4dlyTj4B03drV+CHhjHvLCv+I=
 github.com/jasonlabz/knife4go v1.0.1-0.20260814173510-ca6aa81e95f1/go.mod h1:L/Sxj27i0b6G8R1DhGWGRtxmOyFPds4W6yoOZOotiSs=
 github.com/jasonlabz/oracle v1.1.1-0.20240609161033-cf780c860ebb h1:T+ElDctDdFYlNxJkqJR6TAzTyxSsV/T72spEZ6c1Gq4=
 github.com/jasonlabz/oracle v1.1.1-0.20240609161033-cf780c860ebb/go.mod h1:uoouM4+ZKzkGqOJ6Qor4opYCI0ASU7zB5NqSPmPJ6Fg=

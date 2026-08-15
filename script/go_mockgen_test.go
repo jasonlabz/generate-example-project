@@ -24,6 +24,7 @@ func TestGoMockgen(t *testing.T) {
 		runFixtureMockgen(t, fixture, "-p", "server/api")
 		assertFileExists(t, filepath.Join(fixture.root, "server", "mocks", "server", "api", "mock_contract.go"))
 		assertFileDoesNotExist(t, filepath.Join(fixture.root, "server", "mocks", "server", "api", "mock_ignored.gen.go"))
+		assertFileDoesNotExist(t, filepath.Join(fixture.root, "server", "mocks", "server", "api", "mock_constants.go"))
 		assertFileDoesNotExist(t, filepath.Join(fixture.root, ".mocks", "internal", "dao", "interfaces", "mock_contract.go"))
 		assertFakeMockgenInvoked(t, fixture)
 	})
@@ -56,9 +57,9 @@ func TestGoMockgen(t *testing.T) {
 		assertFakeMockgenInvoked(t, fixture)
 	})
 
-	t.Run("redirects-nested-internal-output", func(t *testing.T) {
+	t.Run("mirrors-nested-internal-output", func(t *testing.T) {
 		runFixtureMockgen(t, fixture, "-p", "cmd/tool/internal/sample")
-		assertFileExists(t, filepath.Join(fixture.root, "cmd", "tool", ".mocks", "internal", "sample", "mock_contract.go"))
+		assertFileExists(t, filepath.Join(fixture.root, "server", "mocks", "cmd", "tool", "internal", "sample", "mock_contract.go"))
 		assertFakeMockgenInvoked(t, fixture)
 	})
 
@@ -80,10 +81,10 @@ func newMockgenFixtureProject(t *testing.T) mockgenFixtureProject {
 	root := t.TempDir()
 	writeFixtureFile(t, root, "go.mod", "module mockgenfixture\n\ngo 1.25.0\n")
 	copyFixtureFile(t, root, "script/go-mockgen.sh")
-	copyFixtureFile(t, root, "script/internal/mockscan/main.go")
 	writeFixtureFile(t, root, "server/api/contract.go", "package api\n\ntype Contract interface { Run() error }\n")
 	writeFixtureFile(t, root, "server/api/ignored_test.go", "package api\n\ntype TestOnly interface { Stop() }\n")
 	writeFixtureFile(t, root, "server/api/ignored.gen.go", "package api\n\ntype Generated interface { Reset() }\n")
+	writeFixtureFile(t, root, "server/api/constants.go", "package api\n\nconst Name = \"example\"\n")
 	writeFixtureFile(t, root, "internal/dao/interfaces/contract.go", "package interfaces\n\ntype Repository interface { Find() error }\n")
 	writeFixtureFile(t, root, "cmd/tool/internal/sample/contract.go", "package sample\n\ntype Contract interface { Run() error }\n")
 

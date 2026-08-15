@@ -8,56 +8,54 @@ import (
 	"github.com/gin-gonic/gin"
 	knife "github.com/jasonlabz/knife4go"
 	"github.com/jasonlabz/potato/configx"
-	"github.com/jasonlabz/potato/middleware"
-
-	healthcheckwire "github.com/jasonlabz/generate-example-project/server/wire/health_check"
+	_middleware "github.com/jasonlabz/potato/middleware"
 )
 
 // InitApiRouter creates the API router from the global server configuration.
 func InitApiRouter() (*gin.Engine, error) {
-	serverConfig := configx.GetConfig()
-	return newAPIRouter(serverConfig.GetName(), serverConfig.IsDebugMode())
-}
-
-// newAPIRouter creates an API router from deterministic inputs.
-func newAPIRouter(serviceName string, debug bool) (*gin.Engine, error) {
 	router := gin.New()
 
-	// 全局中间件，查看定义的中间价在middlewares文件夹中
-	rootMiddleware(router)
+	serverConfig := configx.GetConfig()
 
-	humaConfig := huma.DefaultConfig(serviceName, "v1")
+	//modules := appwire.Modules()
+
+	// Engine scope: recovery protects every route, including non-Huma assets.
+	rootMiddleware(router,
+		_middleware.RecoveryLog(true),
+		_middleware.SetContext(),
+		_middleware.RequestMiddleware(),
+	)
+
+	serverGroup := router.Group(fmt.Sprintf("/%s", serverConfig.GetName()))
+	humaConfig := huma.DefaultConfig(serverConfig.GetName(), "v1")
 	humaConfig.DocsPath = ""
 	humaConfig.OpenAPIPath = ""
 	humaConfig.SchemasPath = ""
 	// Disable schema links to preserve the existing HTTP response contract.
 	humaConfig.CreateHooks = nil
-	routerApi := humagin.New(router, humaConfig)
-	registerRootAPI(routerApi)
 
-	serverGroup := router.Group(fmt.Sprintf("/%s", serviceName))
-	// Knife4go must observe the completed Huma document when it registers debug routes.
-	if debug {
+	// Huma owns the application route hierarchy. Groups compose prefixes and
+	// OpenAPI metadata while retaining the same underlying Gin adapter.
+	serverAPI := humagin.NewWithGroup(router, serverGroup, humaConfig)
+	//registerBaseAPI(serverAPI, modules...)
+
+	// Knife4go is a Gin-based documentation asset, so it is the only route
+	// infrastructure that still receives a Gin group.
+	if serverConfig.IsDebugMode() {
 		if err := knife.Init(serverGroup, knife.DocumentProviderFunc(func() ([]byte, error) {
-			return routerApi.OpenAPI().Downgrade()
+			return serverAPI.OpenAPI().Downgrade()
 		})); err != nil {
 			return nil, fmt.Errorf("initialize knife4go documentation: %w", err)
 		}
 	}
+	apiGroup := huma.NewGroup(serverAPI, "/api")
 
-	// base api
-	registerBaseAPI(serverGroup)
-
-	apiGroup := serverGroup.Group("/api")
-
-	// 中间件拦截器
-	groupMiddleware(apiGroup,
-		middleware.RecoveryLog(true), middleware.SetContext(), middleware.RequestMiddleware())
-
-	// v1 group api
-	v1Group := apiGroup.Group("/v1")
+	v1Group := huma.NewGroup(apiGroup, "/v1")
 	registerV1GroupAPI(v1Group)
 
+	// may be change to /v2 api group
+	//v2Group := huma.NewGroup(apiGroup, "/v2")
+	//registerV1GroupAPI(v2Group, modules...)
 	return router, nil
 }
 
@@ -65,20 +63,17 @@ func rootMiddleware(r *gin.Engine, middlewares ...gin.HandlerFunc) {
 	r.Use(middlewares...)
 }
 
-func groupMiddleware(g *gin.RouterGroup, middlewares ...gin.HandlerFunc) {
-	g.Use(middlewares...)
+// registerRootAPI registers all module routes served from the server API.\
+func registerRootAPI(api huma.API, middleware ...huma.Middlewares) {
+
 }
 
-// registerRootAPI registers routes served from the root API.
-func registerRootAPI(api huma.API) {
-	healthCheckController := healthcheckwire.NewController()
-	healthCheckController.Register(api)
-}
+// 注册服務路由  http://ip:port/server_name/**
+func registerBaseAPI(api huma.API, middleware ...huma.Middlewares) {
 
-// 注册服務路由  http://ip:port/server_name/api/**
-func registerBaseAPI(router *gin.RouterGroup) {}
+}
 
 // 注册組路由 http://ip:port/server_name/api/v1/**
-func registerV1GroupAPI(router *gin.RouterGroup) {
-	// v1.RegisterSchedulerManagerGroup(router)
+func registerV1GroupAPI(api huma.API, middleware ...huma.Middlewares) {
+
 }
