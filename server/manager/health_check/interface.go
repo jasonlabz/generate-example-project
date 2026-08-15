@@ -1,5 +1,5 @@
-// Package manager contains application managers that coordinate infrastructure work.
-package manager
+// Package health_check coordinates dependencies used by the health-check use case.
+package health_check
 
 import "context"
 

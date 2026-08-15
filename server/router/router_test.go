@@ -11,7 +11,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humagin"
 	"github.com/gin-gonic/gin"
-	"github.com/jasonlabz/generate-example-project/server/mocks"
+	controller_mocks "github.com/jasonlabz/generate-example-project/server/mocks/server/controller/health_check"
 	"go.uber.org/mock/gomock"
 )
 
@@ -122,6 +122,25 @@ func TestNewAPIRouter_ProductionHidesOpenAPIDocument(t *testing.T) {
 	}
 }
 
+func TestNewAPIRouter_DoesNotRegisterLegacyStaticFiles(t *testing.T) {
+	router, err := newAPIRouter("example", false)
+	if err != nil {
+		t.Fatalf("newAPIRouter() error = %v", err)
+	}
+
+	for _, route := range router.Routes() {
+		if strings.HasPrefix(route.Path, "/server/") {
+			t.Errorf("legacy static route = %q, want none", route.Path)
+		}
+	}
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/server/", nil))
+	if recorder.Code != http.StatusNotFound {
+		t.Errorf("GET /server/ status = %d, want %d", recorder.Code, http.StatusNotFound)
+	}
+}
+
 func TestRegisterRootAPI_DelegatesToHealthCheckController(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -130,7 +149,7 @@ func TestRegisterRootAPI_DelegatesToHealthCheckController(t *testing.T) {
 	api := humagin.New(router, config)
 
 	mockController := gomock.NewController(t)
-	healthCheckController := mocks.NewMockHealthCheckController(mockController)
+	healthCheckController := controller_mocks.NewMockHealthCheckController(mockController)
 	healthCheckController.EXPECT().Register(gomock.Any())
 
 	registerRootAPI(api, healthCheckController)

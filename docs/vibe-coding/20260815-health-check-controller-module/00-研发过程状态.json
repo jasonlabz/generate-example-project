@@ -1,0 +1,249 @@
+{
+  "schemaVersion": 6,
+  "workflow": "using-workflow",
+  "title": "Health Check Controller 模块化",
+  "flowLevel": "M",
+  "scope": "backend",
+  "source": "用户确认 Service 所有接口、Controller 构造注入及 Health Check 模块目录结构",
+  "taskId": "TASK-01",
+  "taskCardId": "n-a",
+  "pendingTaskIds": [],
+  "currentStage": "test-validation",
+  "nextStage": null,
+  "overallStatus": "blocked",
+  "updatedAt": "2026-08-15T05:33:55.182Z",
+  "stages": {
+    "requirement-analysis": {
+      "status": "passed",
+      "reason": "flow-level:M；需求、对外契约和模块边界均已确认，无需技术设计。",
+      "summary": "已冻结 Health Check 模块化范围、验收和兼容边界，进入代码规划。",
+      "mode": null,
+      "artifacts": [
+        "01-需求分析.md"
+      ],
+      "updatedAt": "2026-08-15T04:50:57.391Z"
+    },
+    "tech-design": {
+      "status": "pending",
+      "reason": "",
+      "summary": "",
+      "mode": null,
+      "artifacts": [],
+      "updatedAt": null
+    },
+    "database": {
+      "status": "pending",
+      "reason": "",
+      "summary": "",
+      "mode": null,
+      "artifacts": [],
+      "updatedAt": null
+    },
+    "api-doc": {
+      "status": "pending",
+      "reason": "",
+      "summary": "",
+      "mode": null,
+      "artifacts": [],
+      "updatedAt": null
+    },
+    "card-planning": {
+      "status": "pending",
+      "reason": "",
+      "summary": "",
+      "mode": null,
+      "artifacts": [],
+      "updatedAt": null
+    },
+    "code-planning": {
+      "status": "passed",
+      "reason": "",
+      "summary": "TASK-01 已绑定且用户确认执行，进入实现阶段。",
+      "mode": null,
+      "artifacts": [
+        "07-代码规划.md"
+      ],
+      "updatedAt": "2026-08-15T05:00:00.118Z"
+    },
+    "code-implementation": {
+      "status": "passed",
+      "reason": "",
+      "summary": "TASK-01 已完成模块化、Mock 生成和回归，交由独立代码评审。",
+      "mode": null,
+      "artifacts": [
+        "08-实现声明.md"
+      ],
+      "updatedAt": "2026-08-15T05:19:45.532Z"
+    },
+    "code-review": {
+      "status": "passed",
+      "reason": "",
+      "summary": "独立评审无必须修复项，进入 release 验证。",
+      "mode": null,
+      "artifacts": [
+        "09-代码评审.md"
+      ],
+      "updatedAt": "2026-08-15T05:21:25.690Z"
+    },
+    "test-validation": {
+      "status": "blocked",
+      "reason": "golangci-lint v2.12.2 已安装，但全仓 lint 的 7 项 finding 均位于未改动的历史文件；清理它们或调整 lint 基线均超出当前 Task 授权范围。",
+      "summary": "等待用户确定是清理既有 lint 债务，还是提供仅检查变更范围的质量策略。",
+      "mode": null,
+      "artifacts": [
+        "10-验证报告.md"
+      ],
+      "updatedAt": "2026-08-15T05:33:55.182Z"
+    },
+    "code-commit": {
+      "status": "pending",
+      "reason": "",
+      "summary": "",
+      "mode": null,
+      "artifacts": [],
+      "updatedAt": null
+    },
+    "delivery-release": {
+      "status": "pending",
+      "reason": "",
+      "summary": "",
+      "mode": null,
+      "artifacts": [],
+      "updatedAt": null
+    }
+  },
+  "history": [
+    {
+      "at": "2026-08-15T04:49:53.792Z",
+      "stage": "requirement-analysis",
+      "status": "running",
+      "nextStage": null,
+      "reason": "flow-level: flow-level:M；改动跨 Controller、Service、路由与 Mock 生成链路，但对外 HTTP 契约、数据和权限不变，且模块边界与注入方案已由用户确认。",
+      "summary": "",
+      "mode": null,
+      "gate": null,
+      "recovery": null
+    },
+    {
+      "at": "2026-08-15T04:50:57.391Z",
+      "stage": "requirement-analysis",
+      "status": "passed",
+      "nextStage": "code-planning",
+      "reason": "flow-level:M；需求、对外契约和模块边界均已确认，无需技术设计。",
+      "summary": "已冻结 Health Check 模块化范围、验收和兼容边界，进入代码规划。",
+      "mode": null,
+      "gate": null,
+      "recovery": null
+    },
+    {
+      "at": "2026-08-15T04:51:42.881Z",
+      "stage": "code-planning",
+      "status": "running",
+      "nextStage": null,
+      "reason": "",
+      "summary": "正在冻结 TASK-01 的文件地图、TDD 步骤和生成物边界。",
+      "mode": null,
+      "gate": null,
+      "recovery": null
+    },
+    {
+      "at": "2026-08-15T05:00:00.118Z",
+      "stage": "code-planning",
+      "status": "passed",
+      "nextStage": "code-implementation",
+      "reason": "",
+      "summary": "TASK-01 已绑定且用户确认执行，进入实现阶段。",
+      "mode": null,
+      "gate": null,
+      "recovery": null
+    },
+    {
+      "at": "2026-08-15T05:00:00.200Z",
+      "stage": "code-implementation",
+      "status": "running",
+      "nextStage": null,
+      "reason": "",
+      "summary": "正在按 TDD 实现 Health Check Controller 模块化。",
+      "mode": null,
+      "gate": null,
+      "recovery": null
+    },
+    {
+      "at": "2026-08-15T05:19:45.532Z",
+      "stage": "code-implementation",
+      "status": "passed",
+      "nextStage": "code-review",
+      "reason": "",
+      "summary": "TASK-01 已完成模块化、Mock 生成和回归，交由独立代码评审。",
+      "mode": null,
+      "gate": null,
+      "recovery": null
+    },
+    {
+      "at": "2026-08-15T05:19:45.587Z",
+      "stage": "code-review",
+      "status": "running",
+      "nextStage": null,
+      "reason": "",
+      "summary": "正在对 TASK-01 实施只读代码评审。",
+      "mode": null,
+      "gate": null,
+      "recovery": null
+    },
+    {
+      "at": "2026-08-15T05:21:25.690Z",
+      "stage": "code-review",
+      "status": "passed",
+      "nextStage": "test-validation",
+      "reason": "",
+      "summary": "独立评审无必须修复项，进入 release 验证。",
+      "mode": null,
+      "gate": null,
+      "recovery": null
+    },
+    {
+      "at": "2026-08-15T05:21:25.758Z",
+      "stage": "test-validation",
+      "status": "running",
+      "nextStage": null,
+      "reason": "",
+      "summary": "正在对 TASK-01 执行独立 release 验证。",
+      "mode": null,
+      "gate": null,
+      "recovery": null
+    },
+    {
+      "at": "2026-08-15T05:25:17.491Z",
+      "stage": "test-validation",
+      "status": "blocked",
+      "nextStage": null,
+      "reason": "golangci-lint run 无法执行：环境检测确认工具未安装且不在 PATH。",
+      "summary": "除强制 Go lint 外的 release 检查通过；等待用户授权安装 golangci-lint v2.12.2 后重验。",
+      "mode": null,
+      "gate": null,
+      "recovery": null
+    },
+    {
+      "at": "2026-08-15T05:29:49.681Z",
+      "stage": "test-validation",
+      "status": "running",
+      "nextStage": null,
+      "reason": "",
+      "summary": "golangci-lint v2.12.2 已安装并正在进行 release 重验。",
+      "mode": null,
+      "gate": null,
+      "recovery": null
+    },
+    {
+      "at": "2026-08-15T05:33:55.182Z",
+      "stage": "test-validation",
+      "status": "blocked",
+      "nextStage": null,
+      "reason": "golangci-lint v2.12.2 已安装，但全仓 lint 的 7 项 finding 均位于未改动的历史文件；清理它们或调整 lint 基线均超出当前 Task 授权范围。",
+      "summary": "等待用户确定是清理既有 lint 债务，还是提供仅检查变更范围的质量策略。",
+      "mode": null,
+      "gate": null,
+      "recovery": null
+    }
+  ]
+}

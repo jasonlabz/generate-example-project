@@ -1,5 +1,21 @@
 # 脚本说明
 
+## go-mockgen.sh
+
+扫描项目中声明导出 interface 的非测试 Go 源文件，并以项目相对路径镜像生成 GoMock。私有 interface 可能引用同包私有类型，不能由外部 Mock 包合法实现，因此会被跳过。请在 Git Bash 中从项目根执行：
+
+```shell
+bash script/go-mockgen.sh -o server/mocks
+```
+
+PowerShell 用户可显式调用 Git Bash：
+
+```powershell
+& 'C:\Program Files\Git\bin\bash.exe' script/go-mockgen.sh -o server/mocks
+```
+
+生成目录会被扫描器跳过；`internal/` 源码的 Mock 会放在其 internal 父目录的 `.mocks/`，避免违反 Go 的 internal 可见性规则。不要手工修改生成文件。
+
 ## gentol.sh | gentol.ps1
 
 统一处理数据库代码生成和 DDL 执行：

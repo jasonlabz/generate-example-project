@@ -65,7 +65,11 @@ func ensureDB(ctx context.Context) {
 		resource.Logger.Errorf(ctx, "[ensureDB] 连接服务器失败: %v", err)
 		return
 	}
-	defer gormx.Close(adminCfg.DBName)
+	defer func() {
+		if err := gormx.Close(adminCfg.DBName); err != nil {
+			resource.Logger.Errorf(ctx, "[ensureDB] 关闭管理员数据库连接失败: %v", err)
+		}
+	}()
 
 	if dbExists(adminDB, creator, cfg.Database) {
 		return
@@ -231,7 +235,10 @@ func parseHeaderVersion(path string) string {
 	if err != nil {
 		return ""
 	}
-	defer f.Close()
+	// 仅读取版本声明，关闭失败不会影响已提取的版本。
+	defer func() {
+		_ = f.Close()
+	}()
 
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {

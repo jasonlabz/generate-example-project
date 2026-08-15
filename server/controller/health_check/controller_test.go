@@ -1,4 +1,4 @@
-package controller_test
+package health_check
 
 import (
 	"encoding/json"
@@ -10,14 +10,14 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humagin"
 	"github.com/gin-gonic/gin"
-	"github.com/jasonlabz/generate-example-project/server/controller"
-	"github.com/jasonlabz/generate-example-project/server/mocks"
+	service_mocks "github.com/jasonlabz/generate-example-project/server/mocks/server/service/health_check"
+	service "github.com/jasonlabz/generate-example-project/server/service/health_check"
 	"go.uber.org/mock/gomock"
 )
 
-func TestHealthCheckController_Register_ReturnsSuccessEnvelope(t *testing.T) {
-	router, service := newHealthCheckRouter(t)
-	service.EXPECT().Check(gomock.Any()).Return(nil)
+func TestController_Register_ReturnsSuccessEnvelope(t *testing.T) {
+	router, healthCheckService := newHealthCheckRouter(t)
+	healthCheckService.EXPECT().Check(gomock.Any()).Return(service.HealthCheckResult{Status: "success"}, nil)
 
 	request := httptest.NewRequest(http.MethodGet, "/health-check", nil)
 	response := httptest.NewRecorder()
@@ -47,10 +47,10 @@ func TestHealthCheckController_Register_ReturnsSuccessEnvelope(t *testing.T) {
 	}
 }
 
-func TestHealthCheckController_Register_AdaptsServiceFailure(t *testing.T) {
-	router, service := newHealthCheckRouter(t)
+func TestController_Register_AdaptsServiceFailure(t *testing.T) {
+	router, healthCheckService := newHealthCheckRouter(t)
 	serviceErr := errors.New("health dependency unavailable")
-	service.EXPECT().Check(gomock.Any()).Return(serviceErr)
+	healthCheckService.EXPECT().Check(gomock.Any()).Return(service.HealthCheckResult{}, serviceErr)
 
 	request := httptest.NewRequest(http.MethodGet, "/health-check", nil)
 	response := httptest.NewRecorder()
@@ -78,7 +78,7 @@ func TestHealthCheckController_Register_AdaptsServiceFailure(t *testing.T) {
 	}
 }
 
-func newHealthCheckRouter(t *testing.T) (*gin.Engine, *mocks.MockHealthCheckService) {
+func newHealthCheckRouter(t *testing.T) (*gin.Engine, *service_mocks.MockHealthCheckService) {
 	t.Helper()
 
 	gin.SetMode(gin.TestMode)
@@ -91,8 +91,9 @@ func newHealthCheckRouter(t *testing.T) (*gin.Engine, *mocks.MockHealthCheckServ
 	api := humagin.New(router, config)
 
 	mockController := gomock.NewController(t)
-	service := mocks.NewMockHealthCheckService(mockController)
-	controller.NewHealthCheckController(service).Register(api)
+	healthCheckService := service_mocks.NewMockHealthCheckService(mockController)
+	controller := NewHealthCheckController(healthCheckService)
+	controller.Register(api)
 
-	return router, service
+	return router, healthCheckService
 }

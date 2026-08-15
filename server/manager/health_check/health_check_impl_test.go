@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/jasonlabz/generate-example-project/server/manager/health_check"
-	"github.com/jasonlabz/generate-example-project/server/mocks"
+	manager_mocks "github.com/jasonlabz/generate-example-project/server/mocks/server/manager/health_check"
 	"go.uber.org/mock/gomock"
 )
 
@@ -29,7 +29,7 @@ func TestManager_Check(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			probe := mocks.NewMockHealthProbe(ctrl)
+			probe := manager_mocks.NewMockHealthProbe(ctrl)
 			probe.EXPECT().Probe(gomock.Any()).Return(test.probeErr)
 
 			err := health_check.NewManager(probe).Check(context.Background())
