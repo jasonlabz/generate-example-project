@@ -11,10 +11,10 @@ bash script/go-mockgen.sh
 在 PowerShell 中，可显式调用 Git Bash：
 
 ```powershell
-& 'C:\Program Files\Git\bin\bash.exe' script/go-mockgen.sh -o server/mocks
+& 'C:\Program Files\Git\bin\bash.exe' script/go-mockgen.sh -o mocks
 ```
 
-常规源码按项目相对路径镜像，例如 `server/service/health_check/interface.go` 生成到 `server/mocks/server/service/health_check/mock_interface.go`。只有导出 interface 会生成外部 Mock；私有 interface 可能引用同包私有类型。若输出根目录位于 `internal/` 下，使用 `-s internal` 剥掉源码路径重复的前缀：
+常规源码按项目相对路径镜像，例如 `server/service/health_check/interface.go` 生成到 `mocks/server/service/health_check/mock_interface.go`。只有导出 interface 会生成外部 Mock；私有 interface 可能引用同包私有类型。若输出根目录位于 `internal/` 下，使用 `-s internal` 剥掉源码路径重复的前缀：
 
 ```shell
 bash script/go-mockgen.sh -p internal/dao -o internal/mocks -s internal

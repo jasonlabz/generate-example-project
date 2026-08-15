@@ -11,7 +11,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humagin"
 	"github.com/gin-gonic/gin"
-	controller_mocks "github.com/jasonlabz/generate-example-project/server/mocks/server/controller/health_check"
+	controller_mocks "github.com/jasonlabz/generate-example-project/mocks/server/controller/health_check"
 	route_module "github.com/jasonlabz/generate-example-project/server/module"
 	"go.uber.org/mock/gomock"
 )

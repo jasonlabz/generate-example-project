@@ -19,12 +19,12 @@ Router 只注册 HTTP 路由；`server/wire/health_check` 创建并连接 Probe�
 
 ## 接口与测试
 
-`HealthCheckService` 由 `server/service/health_check` 拥有，因为它表达应用用例的语义；Controller 通过 `NewHealthCheckController` 接收该接口。这既使依赖关系清晰，也能让 Controller 测试直接注入 `server/mocks/server/service/health_check` 的 `MockHealthCheckService`。Service 测试注入 `MockHealthCheckManager`，Manager 测试注入 `MockHealthProbe`，每层只替换自己的直接下层。
+`HealthCheckService` 由 `server/service/health_check` 拥有，因为它表达应用用例的语义；Controller 通过 `NewHealthCheckController` 接收该接口。这既使依赖关系清晰，也能让 Controller 测试直接注入 `mocks/server/service/health_check` 的 `MockHealthCheckService`。Service 测试注入 `MockHealthCheckManager`，Manager 测试注入 `MockHealthProbe`，每层只替换自己的直接下层。
 
 运行相关测试和更新 Mock：
 
 ```shell
-bash script/go-mockgen.sh -o server/mocks
+bash script/go-mockgen.sh
 go test ./server/controller/health_check ./server/service/health_check ./server/manager/health_check
 go test ./server/router
 ```

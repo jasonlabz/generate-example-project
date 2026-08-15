@@ -47,7 +47,7 @@ normalize_path() {
 }
 
 paths='.'
-mock_root='server/mocks'
+mock_root='mocks'
 strip=''
 
 while getopts 'hp:o:s:' opt; do
@@ -166,5 +166,8 @@ while IFS= read -r source_path; do
 	target="$destination_directory/mock_$source_filename.go"
 
 	mkdir -p "$destination_directory"
-	mockgen -source="$source_path" -destination="$target" -package=mocks
+	(cd "$project_root" && mockgen \
+		-source="$source_relative_path" \
+		-destination="${target#"$project_root/"}" \
+		-package=mocks)
 done < <(printf '%s\n' "${source_files[@]}" | LC_ALL=C sort -u)

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	manager_mocks "github.com/jasonlabz/generate-example-project/server/mocks/server/manager/health_check"
+	manager_mocks "github.com/jasonlabz/generate-example-project/mocks/server/manager/health_check"
 	"github.com/jasonlabz/generate-example-project/server/service/health_check"
 	"go.uber.org/mock/gomock"
 )

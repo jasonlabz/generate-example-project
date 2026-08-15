@@ -10,7 +10,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humagin"
 	"github.com/gin-gonic/gin"
-	service_mocks "github.com/jasonlabz/generate-example-project/server/mocks/server/service/health_check"
+	service_mocks "github.com/jasonlabz/generate-example-project/mocks/server/service/health_check"
 	service "github.com/jasonlabz/generate-example-project/server/service/health_check"
 	"go.uber.org/mock/gomock"
 )

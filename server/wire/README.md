@@ -15,6 +15,6 @@ Wire -> Controller -> Service -> Manager -> DAO/Probe
 Router 集成测试覆盖该对象图；层级单元测试则分别通过生成 Mock 替换其直接下游。
 
 ```shell
-bash script/go-mockgen.sh -o server/mocks
+bash script/go-mockgen.sh
 go test ./server/router ./server/controller/health_check ./server/service/health_check ./server/manager/health_check
 ```

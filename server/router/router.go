@@ -18,7 +18,6 @@ func InitApiRouter() (*gin.Engine, error) {
 	router := gin.New()
 
 	serverConfig := configx.GetConfig()
-
 	//modules := appwire.Modules()
 
 	// Engine scope: recovery protects every route, including non-Huma assets.
@@ -39,7 +38,7 @@ func InitApiRouter() (*gin.Engine, error) {
 	// Huma owns the application route hierarchy. Groups compose prefixes and
 	// OpenAPI metadata while retaining the same underlying Gin adapter.
 	serverAPI := humagin.NewWithGroup(router, serverGroup, humaConfig)
-	//registerBaseAPI(serverAPI, modules...)
+	registerBaseAPI(serverAPI)
 
 	// Knife4go is a Gin-based documentation asset, so it is the only route
 	// infrastructure that still receives a Gin group.
@@ -66,13 +65,13 @@ func rootMiddleware(r *gin.Engine, middlewares ...gin.HandlerFunc) {
 }
 
 // registerRootAPI registers all module routes served from the server API.\
-func registerRootAPI(api huma.API, middleware ...huma.Middlewares) {
-	health_check.NewController().Register(api)
-}
+//func registerRootAPI(api huma.API, middleware ...huma.Middlewares) {
+//	health_check.NewController().Register(api)
+//}
 
 // 注册服務路由  http://ip:port/server_name/**
 func registerBaseAPI(api huma.API, middleware ...huma.Middlewares) {
-
+	health_check.NewController().Register(api)
 }
 
 // 注册組路由 http://ip:port/server_name/api/v1/**
