@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"math"
 	"time"
 
 	"github.com/jasonlabz/potato/configx/file"
@@ -12,8 +11,7 @@ import (
 )
 
 var confPaths = []string{"./conf/application.yaml", "./conf/server.yaml", "./conf/config.yaml",
-	"./conf/application.ini", "./conf/server.ini", "./conf/config.ini", "./conf/application.ini",
-	"./conf/server.ini", "./conf/config.ini"}
+	"./conf/application.ini", "./conf/server.ini", "./conf/config.ini"}
 
 type CryptoType string
 
@@ -101,8 +99,8 @@ type Elasticsearch struct {
 	IsHttps            bool     `mapstructure:"is_https" json:"is_https" yaml:"is_https" ini:"is_https"`
 	CloudId            string   `mapstructure:"cloud_id" json:"cloud_id" yaml:"cloud_id" ini:"cloud_id"`
 	APIKey             string   `mapstructure:"api_key" json:"api_key" yaml:"api_key" ini:"api_key"`
-	CACert             string   `mapstructure:"ca_cert" json:"ca_cert" yaml:"ca_cert" ini:"ca_cert"`                                                                          // 客户端证书, 例如："certs/client.pem"
-	InsecureSkipVerify bool     `mapstructure:"insecure_skip_verify" json:"insecure_skip_verify" yaml:"insecure_skip_verify" ini:"insecure_skip_verifyinsecure_skip_verifyv"` // 跳过证书认证，生产应为false
+	CACert             string   `mapstructure:"ca_cert" json:"ca_cert" yaml:"ca_cert" ini:"ca_cert"`                                                     // 客户端证书, 例如："certs/client.pem"
+	InsecureSkipVerify bool     `mapstructure:"insecure_skip_verify" json:"insecure_skip_verify" yaml:"insecure_skip_verify" ini:"insecure_skip_verify"` // 跳过证书认证，生产应为false
 }
 
 type MongodbConf struct {
@@ -140,9 +138,8 @@ type LimitConf struct {
 
 // ServerConfig 新增的配置结构体
 type ServerConfig struct {
-	HTTP   HTTPConfig   `mapstructure:"http" json:"http" yaml:"http" ini:"http"`
-	GRPC   GRPCConfig   `mapstructure:"grpc" json:"grpc" yaml:"grpc" ini:"grpc"`
-	Static StaticConfig `mapstructure:"static" json:"static" yaml:"static" ini:"static"`
+	HTTP HTTPConfig `mapstructure:"http" json:"http" yaml:"http" ini:"http"`
+	GRPC GRPCConfig `mapstructure:"grpc" json:"grpc" yaml:"grpc" ini:"grpc"`
 }
 
 type HTTPConfig struct {
@@ -150,11 +147,11 @@ type HTTPConfig struct {
 	Port   int  `mapstructure:"port" json:"port" yaml:"port" ini:"port"`
 
 	// Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
-	// such as "300ms", "3000", "-1.5h" or "2h45m", default unit "ms".
+	// such as "300ms", "3000", "-1.5h" or "2h45m", default unit "ns".
 	ReadTimeout string `mapstructure:"read_timeout" json:"read_timeout" yaml:"read_timeout" ini:"read_timeout"`
 
 	// Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
-	// such as "300ms", "3000", "-1.5h" or "2h45m", default unit "ms".
+	// such as "300ms", "3000", "-1.5h" or "2h45m", default unit "ns".
 	WriteTimeout string `mapstructure:"write_timeout" json:"write_timeout" yaml:"write_timeout" ini:"write_timeout"`
 }
 
@@ -195,7 +192,7 @@ type Pusher struct {
 	Enable     bool   `mapstructure:"enable" json:"enable" yaml:"enable" ini:"enable"`                     // Enable backend job push metrics to remote pushgateway
 	JobName    string `mapstructure:"job_name" json:"job_name" yaml:"job_name" ini:"job_name"`             // Name of current push job
 	RemoteAddr string `mapstructure:"remote_addr" json:"remote_addr" yaml:"remote_addr" ini:"remote_addr"` // Remote address of pushgateway
-	IntervalMs int    `mapstructure:"IntervalMs" json:"IntervalMs" yaml:"interval_ms" ini:"interval_ms"`   // Push interval in milliseconds
+	IntervalMs int    `mapstructure:"interval_ms" json:"IntervalMs" yaml:"interval_ms" ini:"interval_ms"`  // Push interval in milliseconds
 	BasicAuth  string `mapstructure:"basic_auth" json:"basic_auth" yaml:"basic_auth" ini:"basic_auth"`     // Basic auth of pushgateway
 }
 
@@ -259,10 +256,6 @@ func (c *Config) IsGRPCEnable() bool {
 	return c.Application.Server.GRPC.Enable
 }
 
-func (c *Config) IsStaticEnable() bool {
-	return c.Application.Server.Static.Enable
-}
-
 func (c *Config) GetHTTPPort() int {
 	// 优先使用新的 server.http.port 配置
 	if c.Application.Server.HTTP.Port > 0 {
@@ -288,33 +281,28 @@ func (c *Config) GetPProfConfig() PProfConfig {
 	return c.Application.Monitor.PProf
 }
 
-func (c *Config) GetStaticConfig() StaticConfig {
-	return c.Application.Server.Static
-}
-
-// GetHTTPReadTimeout 获取超时时间（转换为 time.Duration）
+// GetHTTPReadTimeout 获取读超时；未配置返回 0（http.Server 语义：不设置超时）。
 func (c *Config) GetHTTPReadTimeout() time.Duration {
-	if c.Application.Server.HTTP.ReadTimeout != "" {
-		duration, err := time.ParseDuration(c.Application.Server.HTTP.ReadTimeout)
-		if err != nil {
-			log.Printf("parse http read timeout error: %v", err)
-			duration = time.Duration(math.MaxInt64)
-		}
-		return duration
-	}
-	return time.Duration(math.MaxInt64) // 默认值
+	return c.parseTimeout(c.Application.Server.HTTP.ReadTimeout)
 }
 
+// GetHTTPWriteTimeout 获取写超时；未配置返回 0（http.Server 语义：不设置超时）。
 func (c *Config) GetHTTPWriteTimeout() time.Duration {
-	if c.Application.Server.HTTP.WriteTimeout != "" {
-		duration, err := time.ParseDuration(c.Application.Server.HTTP.WriteTimeout)
-		if err != nil {
-			log.Printf("parse http write timeout error: %v", err)
-			duration = time.Duration(math.MaxInt64)
-		}
-		return duration
+	return c.parseTimeout(c.Application.Server.HTTP.WriteTimeout)
+}
+
+// parseTimeout 解析超时字符串；空值返回 0，解析失败记录日志并返回 0。
+// time.ParseDuration 默认单位为纳秒，纯数字需带单位（如 "30s"）。
+func (c *Config) parseTimeout(raw string) time.Duration {
+	if raw == "" {
+		return 0
 	}
-	return time.Duration(math.MaxInt64) // 默认值
+	d, err := time.ParseDuration(raw)
+	if err != nil {
+		log.Printf("parse http timeout %q error: %v", raw, err)
+		return 0
+	}
+	return d
 }
 
 func (c *Config) GetGRPCPort() int {
@@ -342,10 +330,6 @@ func (c *Config) Validate() error {
 		if grpcPort <= 0 || grpcPort > 65535 {
 			return fmt.Errorf("invalid GRPC port: %d", grpcPort)
 		}
-	}
-
-	if c.IsStaticEnable() && c.Application.Server.Static.Path == "" {
-		return errors.New("static.path is required when static.enable=true")
 	}
 
 	return nil

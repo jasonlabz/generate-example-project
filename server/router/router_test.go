@@ -7,13 +7,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/danielgtaylor/huma/v2"
-	"github.com/danielgtaylor/huma/v2/adapters/humagin"
-	"github.com/gin-gonic/gin"
-	controller_mocks "github.com/jasonlabz/generate-example-project/mocks/server/controller/health_check"
-	route_module "github.com/jasonlabz/generate-example-project/server/module"
-	"go.uber.org/mock/gomock"
 )
 
 // newTestAPIRouter builds an isolated router without reading global configuration.
@@ -140,18 +133,4 @@ func TestNewAPIRouter_DoesNotRegisterLegacyStaticFiles(t *testing.T) {
 	if recorder.Code != http.StatusNotFound {
 		t.Errorf("GET /server/ status = %d, want %d", recorder.Code, http.StatusNotFound)
 	}
-}
-
-func TestRegisterRootAPI_DelegatesToHealthCheckController(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	router := gin.New()
-	config := huma.DefaultConfig("test", "v1")
-	config.CreateHooks = nil
-	api := humagin.New(router, config)
-
-	mockController := gomock.NewController(t)
-	healthCheckController := controller_mocks.NewMockHealthCheckController(mockController)
-	healthCheckController.EXPECT().Register(gomock.Any())
-
-	registerRootAPI(api, route_module.Module{RegisterRoot: healthCheckController.Register})
 }

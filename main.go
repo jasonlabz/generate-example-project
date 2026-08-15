@@ -61,13 +61,12 @@ func main() {
 	}
 
 	pprofSrv := startPProfServer(r, serverConfig)
-	fileSrv := startFileServer(serverConfig)
 	grpcSrv, grpcLis := startGRPCServer(serverConfig)
 
 	// start program
 	srv := startHTTPServer(r, serverConfig)
 
-	if srv == nil && pprofSrv == nil && fileSrv == nil && grpcSrv == nil {
+	if srv == nil && pprofSrv == nil && grpcSrv == nil {
 		log.Println("no service enabled, exiting")
 		return
 	}
@@ -83,11 +82,6 @@ func main() {
 	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelShutdown()
 
-	if fileSrv != nil {
-		if err := fileSrv.Shutdown(shutdownCtx); err != nil {
-			log.Printf("file server shutdown failed: %v", err)
-		}
-	}
 	if pprofSrv != nil {
 		if err := pprofSrv.Shutdown(shutdownCtx); err != nil {
 			log.Printf("pprof server shutdown failed: %v", err)
@@ -185,46 +179,4 @@ func startGRPCServer(c *bootstrap.Config) (*grpc.Server, net.Listener) {
 	}()
 
 	return srv, lis
-}
-
-// startFileServer 文件服务
-func startFileServer(c *bootstrap.Config) *http.Server {
-	config := c.GetStaticConfig()
-	if !c.IsStaticEnable() || config.Path == "" {
-		return nil
-	}
-
-	mux := http.NewServeMux()
-	mux.Handle("/", http.FileServer(http.Dir(config.Path)))
-
-	var handler http.Handler = mux
-	if config.Username != "" && config.Password != "" {
-		handler = basicAuth(mux, config.Username, config.Password)
-	}
-
-	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%d", config.Port),
-		Handler: handler,
-	}
-
-	go func() {
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("file server listen: %s\n", err)
-		}
-	}()
-
-	return srv
-}
-
-// basicAuth 认证检查
-func basicAuth(handler http.Handler, username, password string) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		user, pass, ok := r.BasicAuth()
-		if !ok || user != username || pass != password {
-			w.Header().Set("WWW-Authenticate", `Basic realm="Restricted"`)
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-		handler.ServeHTTP(w, r)
-	})
 }

@@ -15,10 +15,14 @@ import (
 
 // InitApiRouter creates the API router from the global server configuration.
 func InitApiRouter() (*gin.Engine, error) {
-	router := gin.New()
-
 	serverConfig := configx.GetConfig()
-	//modules := appwire.Modules()
+	return newAPIRouter(serverConfig.GetName(), serverConfig.IsDebugMode())
+}
+
+// newAPIRouter builds the API router from deterministic inputs so integration
+// tests can construct it without reading global configuration.
+func newAPIRouter(serviceName string, debug bool) (*gin.Engine, error) {
+	router := gin.New()
 
 	// Engine scope: recovery protects every route, including non-Huma assets.
 	rootMiddleware(router,
@@ -27,36 +31,30 @@ func InitApiRouter() (*gin.Engine, error) {
 		_middleware.RequestMiddleware(),
 	)
 
-	serverGroup := router.Group(fmt.Sprintf("/%s", serverConfig.GetName()))
-	humaConfig := huma.DefaultConfig(serverConfig.GetName(), "v1")
+	humaConfig := huma.DefaultConfig(serviceName, "v1")
 	humaConfig.DocsPath = ""
 	humaConfig.OpenAPIPath = ""
 	humaConfig.SchemasPath = ""
 	// Disable schema links to preserve the existing HTTP response contract.
 	humaConfig.CreateHooks = nil
 
-	// Huma owns the application route hierarchy. Groups compose prefixes and
-	// OpenAPI metadata while retaining the same underlying Gin adapter.
-	serverAPI := humagin.NewWithGroup(router, serverGroup, humaConfig)
-	registerBaseAPI(serverAPI)
+	// Root API serves operations outside the /{service} prefix, e.g. /health-check.
+	api := humagin.New(router, humaConfig)
+	registerRootAPI(api)
 
-	// Knife4go is a Gin-based documentation asset, so it is the only route
-	// infrastructure that still receives a Gin group.
-	if serverConfig.IsDebugMode() {
+	// Knife4go is a Gin-based documentation asset served below /{service}.
+	serverGroup := router.Group(fmt.Sprintf("/%s", serviceName))
+	if debug {
 		if err := knife.Init(serverGroup, knife.DocumentProviderFunc(func() ([]byte, error) {
-			return serverAPI.OpenAPI().Downgrade()
+			return api.OpenAPI().Downgrade()
 		})); err != nil {
 			return nil, fmt.Errorf("initialize knife4go documentation: %w", err)
 		}
 	}
-	apiGroup := huma.NewGroup(serverAPI, "/api")
 
-	v1Group := huma.NewGroup(apiGroup, "/v1")
-	registerV1GroupAPI(v1Group)
+	// Versioned group below /{service}/api/v1 for future modules.
+	registerV1GroupAPI(serverGroup.Group("/api/v1"))
 
-	// may be change to /v2 api group
-	//v2Group := huma.NewGroup(apiGroup, "/v2")
-	//registerV1GroupAPI(v2Group, modules...)
 	return router, nil
 }
 
@@ -64,17 +62,12 @@ func rootMiddleware(r *gin.Engine, middlewares ...gin.HandlerFunc) {
 	r.Use(middlewares...)
 }
 
-// registerRootAPI registers all module routes served from the server API.\
-//func registerRootAPI(api huma.API, middleware ...huma.Middlewares) {
-//	health_check.NewController().Register(api)
-//}
-
-// 注册服務路由  http://ip:port/server_name/**
-func registerBaseAPI(api huma.API, middleware ...huma.Middlewares) {
+// registerRootAPI registers operations served at the engine root.
+func registerRootAPI(api huma.API) {
 	health_check.NewController().Register(api)
 }
 
-// 注册組路由 http://ip:port/server_name/api/v1/**
-func registerV1GroupAPI(api huma.API, middleware ...huma.Middlewares) {
-
+// registerV1GroupAPI registers operations below /{service}/api/v1.
+func registerV1GroupAPI(_ *gin.RouterGroup) {
+	// v1 modules register here, e.g. user.RegisterV1(group).
 }
