@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"log"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -27,7 +28,9 @@ func (paths *pathList) Set(value string) error {
 func main() {
 	root := flag.String("root", "", "project root to scan")
 	var excludes pathList
+	var sourceRoots pathList
 	flag.Var(&excludes, "exclude", "directory tree to exclude")
+	flag.Var(&sourceRoots, "path", "source directory tree to scan")
 	flag.Parse()
 
 	if *root == "" {
@@ -38,6 +41,20 @@ func main() {
 	if err != nil {
 		log.Fatalf("resolve root: %v", err)
 	}
+	for index, path := range sourceRoots {
+		sourceRoot, err := filepath.Abs(path)
+		if err != nil {
+			log.Fatalf("resolve source path %q: %v", path, err)
+		}
+		if !isWithin(sourceRoot, rootPath) {
+			log.Fatalf("source path %q must be within project root %q", sourceRoot, rootPath)
+		}
+		sourceRoots[index] = sourceRoot
+	}
+	if len(sourceRoots) == 0 {
+		sourceRoots = append(sourceRoots, rootPath)
+	}
+
 	for index, path := range excludes {
 		excludePath, err := filepath.Abs(path)
 		if err != nil {
@@ -46,42 +63,57 @@ func main() {
 		excludes[index] = excludePath
 	}
 
-	if err := scan(rootPath, excludes); err != nil {
+	if err := scan(rootPath, sourceRoots, excludes); err != nil {
 		log.Fatal(err)
 	}
 }
 
-// scan emits slash-separated project-relative paths for source files with interfaces.
-func scan(root string, excludes []string) error {
-	return filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if entry.IsDir() {
-			if shouldSkipDirectory(path, entry.Name(), excludes) {
-				return filepath.SkipDir
+// scan emits sorted, slash-separated project-relative paths for source files with interfaces.
+func scan(root string, sourceRoots, excludes []string) error {
+	candidates := make(map[string]struct{})
+	for _, sourceRoot := range sourceRoots {
+		if err := filepath.WalkDir(sourceRoot, func(path string, entry fs.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
 			}
-			return nil
-		}
-		if !strings.HasSuffix(entry.Name(), ".go") || strings.HasSuffix(entry.Name(), "_test.go") {
-			return nil
-		}
+			if entry.IsDir() {
+				if shouldSkipDirectory(path, entry.Name(), excludes) {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if !strings.HasSuffix(entry.Name(), ".go") || strings.HasSuffix(entry.Name(), "_test.go") || strings.HasSuffix(entry.Name(), ".gen.go") {
+				return nil
+			}
 
-		hasInterface, err := declaresExportedInterface(path)
-		if err != nil {
+			hasInterface, err := declaresExportedInterface(path)
+			if err != nil {
+				return err
+			}
+			if !hasInterface {
+				return nil
+			}
+
+			relativePath, err := filepath.Rel(root, path)
+			if err != nil {
+				return fmt.Errorf("make source path relative: %w", err)
+			}
+			candidates[filepath.ToSlash(relativePath)] = struct{}{}
+			return nil
+		}); err != nil {
 			return err
 		}
-		if !hasInterface {
-			return nil
-		}
+	}
 
-		relativePath, err := filepath.Rel(root, path)
-		if err != nil {
-			return fmt.Errorf("make source path relative: %w", err)
-		}
-		fmt.Println(filepath.ToSlash(relativePath))
-		return nil
-	})
+	paths := make([]string, 0, len(candidates))
+	for path := range candidates {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	for _, path := range paths {
+		fmt.Println(path)
+	}
+	return nil
 }
 
 // shouldSkipDirectory keeps generated, vendored, and explicitly excluded code out of scans.

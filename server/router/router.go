@@ -10,8 +10,7 @@ import (
 	"github.com/jasonlabz/potato/configx"
 	"github.com/jasonlabz/potato/middleware"
 
-	health_check_controller "github.com/jasonlabz/generate-example-project/server/controller/health_check"
-	health_check_wire "github.com/jasonlabz/generate-example-project/server/wire/health_check"
+	healthcheckwire "github.com/jasonlabz/generate-example-project/server/wire/health_check"
 )
 
 // InitApiRouter creates the API router from the global server configuration.
@@ -33,14 +32,14 @@ func newAPIRouter(serviceName string, debug bool) (*gin.Engine, error) {
 	humaConfig.SchemasPath = ""
 	// Disable schema links to preserve the existing HTTP response contract.
 	humaConfig.CreateHooks = nil
-	api := humagin.New(router, humaConfig)
-	registerRootAPI(api, health_check_wire.NewHealthCheckController())
+	routerApi := humagin.New(router, humaConfig)
+	registerRootAPI(routerApi)
 
 	serverGroup := router.Group(fmt.Sprintf("/%s", serviceName))
 	// Knife4go must observe the completed Huma document when it registers debug routes.
 	if debug {
 		if err := knife.Init(serverGroup, knife.DocumentProviderFunc(func() ([]byte, error) {
-			return api.OpenAPI().Downgrade()
+			return routerApi.OpenAPI().Downgrade()
 		})); err != nil {
 			return nil, fmt.Errorf("initialize knife4go documentation: %w", err)
 		}
@@ -71,7 +70,8 @@ func groupMiddleware(g *gin.RouterGroup, middlewares ...gin.HandlerFunc) {
 }
 
 // registerRootAPI registers routes served from the root API.
-func registerRootAPI(api huma.API, healthCheckController health_check_controller.HealthCheckController) {
+func registerRootAPI(api huma.API) {
+	healthCheckController := healthcheckwire.NewController()
 	healthCheckController.Register(api)
 }
 

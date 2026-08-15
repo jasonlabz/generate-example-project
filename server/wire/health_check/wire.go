@@ -2,16 +2,16 @@
 package health_check
 
 import (
-	health_check_controller "github.com/jasonlabz/generate-example-project/server/controller/health_check"
-	health_check_manager "github.com/jasonlabz/generate-example-project/server/manager/health_check"
-	health_check_service "github.com/jasonlabz/generate-example-project/server/service/health_check"
+	controller "github.com/jasonlabz/generate-example-project/server/controller/health_check"
+	manager "github.com/jasonlabz/generate-example-project/server/manager/health_check"
+	service "github.com/jasonlabz/generate-example-project/server/service/health_check"
 )
 
-// NewHealthCheckController assembles the production health-check controller.
-func NewHealthCheckController() health_check_controller.HealthCheckController {
-	probe := health_check_manager.NewLocalProbe()
-	manager := health_check_manager.NewManager(probe)
-	service := health_check_service.NewService(manager)
+// NewController assembles the production health-check controller.
+func NewController() controller.HealthCheckController {
+	_probe := manager.NewLocalProbe()
+	_manager := manager.NewManager(_probe)
+	_service := service.NewService(_manager)
 
-	return health_check_controller.NewHealthCheckController(service)
+	return controller.NewHealthCheckController(_service)
 }
