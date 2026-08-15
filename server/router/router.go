@@ -9,6 +9,8 @@ import (
 	knife "github.com/jasonlabz/knife4go"
 	"github.com/jasonlabz/potato/configx"
 	_middleware "github.com/jasonlabz/potato/middleware"
+
+	"github.com/jasonlabz/generate-example-project/server/wire/health_check"
 )
 
 // InitApiRouter creates the API router from the global server configuration.
@@ -65,7 +67,7 @@ func rootMiddleware(r *gin.Engine, middlewares ...gin.HandlerFunc) {
 
 // registerRootAPI registers all module routes served from the server API.\
 func registerRootAPI(api huma.API, middleware ...huma.Middlewares) {
-
+	health_check.NewController().Register(api)
 }
 
 // 注册服務路由  http://ip:port/server_name/**
