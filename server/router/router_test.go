@@ -7,21 +7,37 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/gin-gonic/gin"
+
+	"github.com/jasonlabz/generate-example-project/bootstrap"
 )
 
-// newTestAPIRouter builds an isolated router without reading global configuration.
-func newTestAPIRouter(t *testing.T, debug bool) http.Handler {
+// newTestAPIRouter 用确定性的服务名与 gin 调试模式构造路由。
+//
+// InitApiRouter 从 bootstrap 全局配置读取服务名、用 gin.IsDebugging() 决定是否
+// 注册文档端点，因此测试需在调用前覆盖这两处全局状态。
+func newTestAPIRouter(t *testing.T, debug bool) *gin.Engine {
 	t.Helper()
 
-	router, err := newAPIRouter("example", debug)
+	bootstrap.GetConfig().Application.Name = "example"
+
+	if debug {
+		gin.SetMode(gin.DebugMode)
+	} else {
+		gin.SetMode(gin.ReleaseMode)
+	}
+	t.Cleanup(func() { gin.SetMode(gin.DebugMode) })
+
+	router, err := InitApiRouter()
 	if err != nil {
-		t.Fatalf("newAPIRouter() error = %v", err)
+		t.Fatalf("InitApiRouter() error = %v", err)
 	}
 
 	return router
 }
 
-func TestNewAPIRouter_HealthCheck(t *testing.T) {
+func TestInitApiRouter_HealthCheck(t *testing.T) {
 	router := newTestAPIRouter(t, true)
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/health-check", nil))
@@ -73,7 +89,7 @@ func TestNewAPIRouter_HealthCheck(t *testing.T) {
 	}
 }
 
-func TestNewAPIRouter_DebugOpenAPIDocument(t *testing.T) {
+func TestInitApiRouter_DebugOpenAPIDocument(t *testing.T) {
 	router := newTestAPIRouter(t, true)
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/example/v3/api-docs", nil))
@@ -93,7 +109,7 @@ func TestNewAPIRouter_DebugOpenAPIDocument(t *testing.T) {
 	}
 }
 
-func TestNewAPIRouter_DebugDocumentationPage(t *testing.T) {
+func TestInitApiRouter_DebugDocumentationPage(t *testing.T) {
 	router := newTestAPIRouter(t, true)
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/example/doc.html", nil))
@@ -106,7 +122,7 @@ func TestNewAPIRouter_DebugDocumentationPage(t *testing.T) {
 	}
 }
 
-func TestNewAPIRouter_ProductionHidesOpenAPIDocument(t *testing.T) {
+func TestInitApiRouter_ProductionHidesOpenAPIDocument(t *testing.T) {
 	router := newTestAPIRouter(t, false)
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/example/v3/api-docs", nil))
@@ -116,11 +132,8 @@ func TestNewAPIRouter_ProductionHidesOpenAPIDocument(t *testing.T) {
 	}
 }
 
-func TestNewAPIRouter_DoesNotRegisterLegacyStaticFiles(t *testing.T) {
-	router, err := newAPIRouter("example", false)
-	if err != nil {
-		t.Fatalf("newAPIRouter() error = %v", err)
-	}
+func TestInitApiRouter_DoesNotRegisterLegacyStaticFiles(t *testing.T) {
+	router := newTestAPIRouter(t, false)
 
 	for _, route := range router.Routes() {
 		if strings.HasPrefix(route.Path, "/server/") {
