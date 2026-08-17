@@ -78,6 +78,37 @@ func TestController_Register_AdaptsServiceFailure(t *testing.T) {
 	}
 }
 
+func TestController_Register_PublishesOpenAPIMetadata(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	config := huma.DefaultConfig("test", "v1")
+	config.DocsPath = ""
+	config.OpenAPIPath = ""
+	config.SchemasPath = ""
+	config.CreateHooks = nil
+	api := humagin.New(router, config)
+
+	controller := NewHealthCheckController(nil)
+	controller.Register(api)
+
+	operation := api.OpenAPI().Paths["/health-check"].Get
+	if operation == nil {
+		t.Fatal("health-check operation was not registered")
+	}
+	if operation.OperationID != "health-check" || operation.Summary != "健康检查" {
+		t.Fatalf("operation metadata = %#v, want health-check metadata", operation)
+	}
+	if len(operation.Tags) != 2 || operation.Tags[0] != "系统" || operation.Tags[1] != "健康检查" {
+		t.Fatalf("operation tags = %#v, want system and health-check tags", operation.Tags)
+	}
+	if response := operation.Responses["200"]; response == nil || response.Description != "服务正常，data 包含当前健康状态。" {
+		t.Fatalf("success response = %#v, want documented 200 response", response)
+	}
+	if response := operation.Responses["500"]; response == nil || response.Description != "Internal Server Error" {
+		t.Fatalf("failure response = %#v, want Huma-generated 500 response", response)
+	}
+}
+
 func newHealthCheckRouter(t *testing.T) (*gin.Engine, *service_mocks.MockHealthCheckService) {
 	t.Helper()
 

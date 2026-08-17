@@ -31,23 +31,25 @@ type HealthCheckController interface {
 	Register(api huma.API)
 }
 
-// Register 把健康检查的 HTTP 操作注册到 api（通常传入 huma 组，如 serverAPI）。
+// Register 将 GET /health-check 注册到 api（通常传入 huma 组，如 serverAPI）。
 //
-// huma.Register 三个参数：
-//  1. api：huma.API 或 huma.NewGroup 创建的组（组会自动应用前缀）；
-//  2. huma.Operation：OpenAPI 元信息（Summary/Tags/OperationID 等），
-//     等价于 swag 的 @Summary/@Tags/@ID 注解；
-//  3. handler：func(ctx context.Context, input *In) (*Out, error)——
-//     入参/出参用结构体表达，huma 负责反序列化、校验与序列化。
+// 接口契约：
+//   - 200：返回 humax.Envelope[[]string]，data 为当前健康状态（通常是 success）；
+//   - 500：返回 humax.Error，包含 code、message、err_trace、version 和空 data；
+//   - 无请求参数、无鉴权要求，适用于负载均衡器和容器探针检查服务存活状态。
+//
+// huma 会根据 handler 的输入输出类型生成 OpenAPI schema；Operation 中的
+// Summary、Description、Tags、OperationID 和 Errors 对应传统 Swagger 注解
+// @Summary、@Description、@Tags、@ID 和 @Failure。
 func (c *controller) Register(api huma.API) {
 	huma.Register(api, huma.Operation{
 		// —— 路由与 OpenAPI 基础信息（对应 swag 的 @Router/@ID/@Summary/@Tags）——
-		OperationID: "health-check",         // 全局唯一操作标识（对应 @ID）
-		Method:      http.MethodGet,         // HTTP 方法（对应 @Router 前半部分）
-		Path:        "/health-check",        // 路径，路径参数用 {name} 占位（对应 @Router）
-		Summary:     "健康检查",                 // 接口名（对应 @Summary，显示在文档列表）
-		Description: "检查服务是否存活，返回当前运行状态。",   // 接口说明（对应 @Description，显示在文档详情）
-		Tags:        []string{"系统", "健康检查"}, // 分组标签（对应 @Tags，文档按此分组展示）
+		OperationID: "health-check",                                                                     // 全局唯一操作标识（对应 @ID）
+		Method:      http.MethodGet,                                                                     // HTTP 方法（对应 @Router 前半部分）
+		Path:        "/health-check",                                                                    // 路径，路径参数用 {name} 占位（对应 @Router）
+		Summary:     "健康检查",                                                                             // 接口名（对应 @Summary，显示在文档列表）
+		Description: "用于负载均衡器、容器探针和运维监控检查服务是否存活。成功时返回 code=0、data=[\"success\"]；依赖检查失败时返回 500 及统一错误信封。", // 接口说明（对应 @Description，显示在文档详情）
+		Tags:        []string{"系统", "健康检查"},                                                             // 分组标签（对应 @Tags，文档按此分组展示）
 
 		// —— 响应与错误声明 ——
 		// 成功状态码：handler 返回 nil error 时使用的默认状态码。
@@ -56,6 +58,9 @@ func (c *controller) Register(api huma.API) {
 		// 会显示在 OpenAPI 文档的 responses 中（对应 @Failure 声明）。
 		Errors: []int{
 			http.StatusInternalServerError, // 500：服务内部错误（humax.InternalServerError）
+		},
+		Responses: map[string]*huma.Response{
+			"200": {Description: "服务正常，data 包含当前健康状态。"},
 		},
 
 		// —— 可选扩展（按需启用）——
