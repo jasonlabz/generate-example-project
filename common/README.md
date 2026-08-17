@@ -6,9 +6,7 @@
 
 ```text
 common/
-├── response/   统一响应信封 Envelope（code/message/data/version/current_time）
-├── humax/      huma 响应封装：Output[T] 成功响应、Error 带状态码错误（StatusError）
-├── ginx/       gin 工具（分页等，仅非 huma 场景使用）
+├── humax/      huma 响应、分页、文件流与错误封装
 ├── consts/     常量
 └── helper/     辅助函数（上下文取值等）
 ```
@@ -21,7 +19,7 @@ common/
 
 ## 关键约定
 
-- **响应信封**：所有 HTTP 响应统一 `response.Envelope[T]`（成功 `response.New`、错误 `response.NewError`）。
+- **响应信封**：所有 HTTP 响应统一 `humax.Envelope[T]`（成功 `humax.New`、错误 `humax.NewError`）。
 - **huma 错误**：handler 错误必须携带状态码（`humax.Error` 实现 `huma.StatusError`），
   新状态码构造函数仿照 `humax.InternalServerError` 增加。
-- 详见 [response/README.md](response/README.md) 与 [humax/README.md](humax/README.md)。
+- 详见 [humax/README.md](humax/README.md)。

@@ -1,11 +1,3 @@
-# Web
+# 前端代码存放位置
 
-Minimal Vue application served by the Go server at `/server/`.
-
-## Commands
-
-```shell
-pnpm install
-pnpm dev
-pnpm build
-```
+当前后端不分离时，前端代码存放在 `web` 目录下。

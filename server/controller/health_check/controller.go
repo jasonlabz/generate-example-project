@@ -3,6 +3,7 @@ package health_check
 import (
 	"context"
 
+	"github.com/jasonlabz/generate-example-project/common/consts"
 	"github.com/jasonlabz/generate-example-project/common/humax"
 	"github.com/jasonlabz/generate-example-project/server/service/health_check"
 )
@@ -25,14 +26,14 @@ func NewHealthCheckController(healthCheckService health_check.HealthCheckService
 //
 // huma handler 签名约定：func(ctx context.Context, input *In) (*Out, error)
 //   - 入参 *struct{}：无请求参数（有参数时定义结构体并用 huma tag 声明位置）；
-//   - 出参 *healthCheckOutput：响应体（Body 字段包装统一信封 response.Envelope）；
+//   - 出参 *healthCheckOutput：响应体（Body 字段包装统一信封 humax.Envelope）；
 //   - error：nil 表示成功；返回实现 huma.StatusError 接口（GetStatus() int）
 //     的错误可携带状态码（见 common/humax.Error）。
 func (c *controller) handle(ctx context.Context, _ *struct{}) (*healthCheckOutput, error) {
 	result, err := c.service.Check(ctx)
 	if err != nil {
 		// 业务错误统一转换为 500 信封响应，保持与旧接口一致的 HTTP 契约。
-		return nil, humax.InternalServerError(apiVersion, err)
+		return nil, humax.InternalServerError(consts.APIVersionV1, err)
 	}
 
 	return toHealthCheckOutput(result), nil

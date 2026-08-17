@@ -22,9 +22,8 @@ main.go                    启动入口：HTTP/GRPC/pprof/Prometheus、优雅退
 bootstrap/                 初始化：配置、日志、DB、迁移、种子数据、RMQ、Redis
 cmd/                       子命令入口（example-server / migrate / tools / worker）
 common/                    跨层通用能力
-├── response/              统一响应信封 Envelope（code/message/data）
-├── humax/                 huma 响应封装：Output[T] 成功、Error 带状态码错误
-├── ginx/                  gin 工具（分页等，仅非 huma 场景）
+├── humax/                 huma 响应、分页、文件流与错误封装
+├── ginx/                  gin Context 写入适配（复用 humax 响应类型）
 └── consts/ helper/        常量与辅助函数
 server/
 ├── router/router.go       路由组装：huma 组层级 + 中间件 + knife4go 文档
@@ -82,7 +81,7 @@ type getUserInput struct {
 }
 
 type userOutput struct {
-	Body *response.Envelope[*userVO]     // 响应体统一用 response.Envelope
+	Body *humax.Envelope[*userVO]        // 响应体统一用 humax.Envelope
 }
 ```
 
@@ -93,9 +92,9 @@ type userOutput struct {
 func (c *controller) handleGet(ctx context.Context, in *getUserInput) (*userOutput, error) {
 	user, err := c.service.GetUser(ctx, in.ID)
 	if err != nil {
-		return nil, humax.NotFoundError(apiVersion, err)  // 带状态码的错误
+		return nil, humax.NotFoundError(consts.APIVersionV1, err)  // 带状态码的错误
 	}
-	return &userOutput{Body: response.New(apiVersion, toUserVO(user))}, nil
+	return &userOutput{Body: humax.New(consts.APIVersionV1, toUserVO(user))}, nil
 }
 ```
 
@@ -126,7 +125,7 @@ func registerV1GroupAPI(api huma.API, middleware ...huma.Middlewares) {
 | `@ID` | `Operation.OperationID` |
 | `@Accept` / `@Produce` | `Operation.ContentTypes`（默认 application/json） |
 | `@Param` | 请求结构体字段 huma tag（`path`/`query`/`header`/`body`） |
-| `@Success` | 出参结构体（`Body` 字段 + `response.Envelope`） |
+| `@Success` | 出参结构体（`Body` 字段 + `humax.Envelope`） |
 | `@Failure` | error + `huma.StatusError`（见 `common/humax.Error`） |
 | `@Router` | `Operation.Method` + `Operation.Path` |
 
@@ -152,7 +151,7 @@ func registerV1GroupAPI(api huma.API, middleware ...huma.Middlewares) {
   `GetStatus() int`），否则 huma 默认按 200/500 处理。
 - 错误统一走 `common/humax.Error`（信封 + 状态码）；需要新状态码时仿照
   `InternalServerError` 增加构造函数。
-- 成功响应统一 `response.Envelope`（版本 + code/message/data）。
+- 成功响应统一 `humax.Envelope`（版本 + code/message/data）。
 
 ### 中间件
 

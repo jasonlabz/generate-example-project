@@ -8,7 +8,7 @@ HTTP 控制器：定义 huma 路由（Operation）、请求/响应模型（DTO�
 server/controller/<module>/
 ├── register.go    包说明 + 路由注册（huma.Register + huma.Operation）
 ├── controller.go  控制器实现（构造函数注入 service 依赖 + huma handler）
-├── types.go       DTO：请求/响应模型（huma tag + response.Envelope）
+├── types.go       DTO：请求/响应模型（huma tag + humax.Envelope）
 └── convertor.go   业务模型 ↔ DTO 转换函数
 ```
 

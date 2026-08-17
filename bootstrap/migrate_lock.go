@@ -8,9 +8,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/jasonlabz/generate-example-project/common/resource"
 	"gorm.io/gorm"
-
-	"github.com/jasonlabz/generate-example-project/global/resource"
 )
 
 // migrationLockTimeout 等待迁移锁的最长时间；超时后放弃并报错退出，不做无限轮询。

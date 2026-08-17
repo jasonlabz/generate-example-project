@@ -9,12 +9,11 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/jasonlabz/generate-example-project/common/resource"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
 	"github.com/jasonlabz/potato/gormx"
-
-	"github.com/jasonlabz/generate-example-project/global/resource"
 )
 
 // ── 常量 ──
