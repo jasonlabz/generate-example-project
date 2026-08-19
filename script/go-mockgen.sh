@@ -116,10 +116,12 @@ while IFS= read -r -d '' candidate; do
 	fi
 done < <(find "$mock_root" -type f -name 'mock_*.go' -print0)
 
+# Detect exported interface declarations (including generic ones) so files
+# without any mocks can be skipped.
 has_exported_interface() {
 	local source_path="$1"
 
-	LC_ALL=C grep -Eq '^[[:space:]]*type[[:space:]]+[A-Z][A-Za-z0-9_]*[[:space:]]+interface([[:space:]]|\{)' "$source_path"
+	LC_ALL=C grep -Eq '^[[:space:]]*type[[:space:]]+[A-Z][A-Za-z0-9_]*(\[.*\])?[[:space:]]+interface([[:space:]]|\{)' "$source_path"
 }
 
 source_files=()
