@@ -89,6 +89,29 @@ func TestInitApiRouter_HealthCheck(t *testing.T) {
 	}
 }
 
+// TestInitApiRouter_ReadinessCheck verifies that the health-check domain also
+// exposes its independently assembled readiness use case.
+func TestInitApiRouter_ReadinessCheck(t *testing.T) {
+	router := newTestAPIRouter(t, true)
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/readiness-check", nil))
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("GET /readiness-check status = %d, want %d", recorder.Code, http.StatusOK)
+	}
+
+	var response struct {
+		Code int      `json:"code"`
+		Data []string `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("GET /readiness-check response: %v", err)
+	}
+	if response.Code != 0 || len(response.Data) != 1 || response.Data[0] != "ready" {
+		t.Fatalf("GET /readiness-check response = %#v, want code 0 and [ready]", response)
+	}
+}
+
 func TestInitApiRouter_DebugOpenAPIDocument(t *testing.T) {
 	router := newTestAPIRouter(t, true)
 	recorder := httptest.NewRecorder()

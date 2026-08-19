@@ -12,3 +12,9 @@ import (
 func toHealthCheckOutput(result health_check.HealthCheckResult) *healthCheckOutput {
 	return &healthCheckOutput{Body: humax.New(consts.APIVersionV1, []string{result.Status})}
 }
+
+// toReadinessCheckOutput keeps readiness results within the same HTTP envelope
+// while preserving their separate service-level contract.
+func toReadinessCheckOutput(result health_check.ReadinessCheckResult) *healthCheckOutput {
+	return &healthCheckOutput{Body: humax.New(consts.APIVersionV1, []string{result.Status})}
+}

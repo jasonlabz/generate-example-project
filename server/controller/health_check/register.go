@@ -26,8 +26,13 @@ import (
 )
 
 // HealthCheckController 定义健康检查模块的路由注册入口。
-// 业务模块控制器统一实现该形态：NewXxxController(...) 构造 + Register(api) 注册。
+// 同域仅一个控制器时使用 NewController(...)；出现多个控制器后，全部改用职责化构造函数。
 type HealthCheckController interface {
+	Register(api huma.API)
+}
+
+// ReadinessCheckController registers the readiness endpoint for this domain.
+type ReadinessCheckController interface {
 	Register(api huma.API)
 }
 
@@ -41,7 +46,7 @@ type HealthCheckController interface {
 // huma 会根据 handler 的输入输出类型生成 OpenAPI schema；Operation 中的
 // Summary、Description、Tags、OperationID 和 Errors 对应传统 Swagger 注解
 // @Summary、@Description、@Tags、@ID 和 @Failure。
-func (c *controller) Register(api huma.API) {
+func (c *healthCheckControllerImpl) Register(api huma.API) {
 	huma.Register(api, huma.Operation{
 		// —— 路由与 OpenAPI 基础信息（对应 swag 的 @Router/@ID/@Summary/@Tags）——
 		OperationID: "health-check",                                                                     // 全局唯一操作标识（对应 @ID）

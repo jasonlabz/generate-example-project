@@ -61,7 +61,7 @@ docs/                      设计文档、开发过程记录
 //  1. api：huma.API 或 huma.NewGroup（组自动应用前缀）；
 //  2. huma.Operation：OpenAPI 元信息（Summary/Tags/OperationID）；
 //  3. handler：func(ctx context.Context, in *In) (*Out, error)。
-func (c *controller) Register(api huma.API) {
+func (c *controllerImpl) Register(api huma.API) {
 	huma.Register(api, huma.Operation{
 		OperationID: "user-get",
 		Method:      http.MethodGet,
@@ -85,11 +85,11 @@ type userOutput struct {
 }
 ```
 
-### 3. 处理器：`controller.go`
+### 3. 处理器：`<module>_controller.go`
 
 ```go
 // handleGet 是 huma 处理器：入参结构体、出参结构体、error（状态码）。
-func (c *controller) handleGet(ctx context.Context, in *getUserInput) (*userOutput, error) {
+func (c *controllerImpl) handleGet(ctx context.Context, in *getUserInput) (*userOutput, error) {
 	user, err := c.service.GetUser(ctx, in.ID)
 	if err != nil {
 		return nil, humax.NotFoundError(consts.APIVersionV1, err)  // 带状态码的错误
@@ -100,10 +100,30 @@ func (c *controller) handleGet(ctx context.Context, in *getUserInput) (*userOutp
 
 ### 4. 业务层
 
+命名规范（service/manager/controller 三层一致，以 health_check 为示范）：
+
+| 项 | 规则 | 示例 |
+|----|------|------|
+| 接口 | 带模块名，放 `interface.go`（可多个） | `HealthCheckService` |
+| 实现文件 | 模块前缀 + `_impl` 后缀 | `health_check_service_impl.go` |
+| 实现 struct | 未导出；域内仅一个职责可用短名，多个职责必须命名 | `healthCheckServiceImpl` / `readinessCheckServiceImpl` |
+| 构造函数 | 域内仅一个职责可用 `NewService`；出现第二个职责后，全部改为职责化名称并返回接口 | `NewHealthCheckService(...)` / `NewReadinessCheckService(...)` |
+| 测试文件 | 模块前缀 + `_impl` + `_test` | `health_check_service_impl_test.go` |
+| 演进 | 一个独立协作职责对应一个小接口与实现，不按方法或接口数量拆包 | `HealthCheckService` / `ReadinessCheckService` |
+
+包边界：`<module>` 目录 = 业务域包。一个包可维护多个 controller/service/manager，接口可同置 `interface.go`，实现按职责分别命名；拆新包的信号是**业务域变化**（独立路由前缀、依赖图、事务边界或生命周期），不是接口数量。
+
+同域多协作者规则：
+
+- Service 的一个接口表达一个可独立注入、mock 与演进的用例职责；同一事务和业务规则内的操作优先聚合为一个 Service。
+- Manager 的一个接口表达一个技术能力；不包含业务判断，也不以接口数量作为拆包依据。
+- Controller 可以在同一业务域包内维护多个 HTTP 操作面。出现第二个 Controller、Service 或 Manager 后，该层所有构造函数都使用 `New<职责><层>(...)`，不得保留含糊的 `NewService`、`NewManager` 或 `NewController`。
+
 - `server/service/<module>/interface.go`：服务接口（供 mockgen 生成 mock）
-- `server/service/<module>/service.go`：实现
-- `server/manager/<module>/`：技术能力层，同样「接口 + 实现」
-- `server/wire/<module>/wire.go`：依赖组装
+- `server/service/<module>/<职责>_service_impl.go`：职责实现
+- `server/manager/<module>/`：技术能力层，同样采用「接口 + 实现」形态
+- `server/controller/<module>/`：同一域内的 HTTP 操作面与 DTO/转换
+- `server/wire/<module>/wire.go`：依赖组装（为每个职责组装完整依赖图）
 
 ### 5. 注册路由
 

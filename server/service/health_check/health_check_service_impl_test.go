@@ -30,7 +30,7 @@ func TestService_Check(t *testing.T) {
 			manager := manager_mocks.NewMockHealthCheckManager(ctrl)
 			manager.EXPECT().Check(gomock.Any()).Return(test.managerErr)
 
-			result, err := health_check.NewService(manager).Check(context.Background())
+			result, err := health_check.NewHealthCheckService(manager).Check(context.Background())
 
 			if test.managerErr == nil {
 				if err != nil {

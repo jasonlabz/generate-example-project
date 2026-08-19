@@ -8,6 +8,11 @@ type HealthCheckManager interface {
 	Check(ctx context.Context) error
 }
 
+// ReadinessCheckManager coordinates readiness-check dependencies.
+type ReadinessCheckManager interface {
+	Check(ctx context.Context) error
+}
+
 // HealthProbe checks the availability of one health-check dependency.
 type HealthProbe interface {
 	Probe(ctx context.Context) error

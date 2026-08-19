@@ -4,3 +4,8 @@ package health_check
 type HealthCheckResult struct {
 	Status string
 }
+
+// ReadinessCheckResult describes the readiness state for service consumers.
+type ReadinessCheckResult struct {
+	Status string
+}

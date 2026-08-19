@@ -7,3 +7,8 @@ import "context"
 type HealthCheckService interface {
 	Check(ctx context.Context) (HealthCheckResult, error)
 }
+
+// ReadinessCheckService verifies whether the application can accept traffic.
+type ReadinessCheckService interface {
+	Check(ctx context.Context) (ReadinessCheckResult, error)
+}

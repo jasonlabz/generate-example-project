@@ -32,7 +32,7 @@ func TestManager_Check(t *testing.T) {
 			probe := manager_mocks.NewMockHealthProbe(ctrl)
 			probe.EXPECT().Probe(gomock.Any()).Return(test.probeErr)
 
-			err := health_check.NewManager(probe).Check(context.Background())
+			err := health_check.NewHealthCheckManager(probe).Check(context.Background())
 
 			if test.wantErr == nil {
 				if err != nil {
