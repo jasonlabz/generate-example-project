@@ -15,22 +15,17 @@ func TestService_Check(t *testing.T) {
 		name       string
 		managerErr error
 	}{
-		{
-			name: "success",
-		},
-		{
-			name:       "wraps manager error",
-			managerErr: errors.New("probe health: unavailable"),
-		},
+		{name: "success"},
+		{name: "wraps manager error", managerErr: errors.New("probe health: unavailable")},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			manager := manager_mocks.NewMockHealthCheckManager(ctrl)
+			manager := manager_mocks.NewMockManager(ctrl)
 			manager.EXPECT().Check(gomock.Any()).Return(test.managerErr)
 
-			result, err := health_check.NewHealthCheckService(manager).Check(context.Background())
+			result, err := health_check.NewService(manager).Check(context.Background())
 
 			if test.managerErr == nil {
 				if err != nil {
@@ -48,5 +43,20 @@ func TestService_Check(t *testing.T) {
 				t.Fatalf("Check() result = %#v, want zero value on error", result)
 			}
 		})
+	}
+}
+
+func TestService_CheckReadiness(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	manager := manager_mocks.NewMockManager(ctrl)
+	manager.EXPECT().CheckReadiness(gomock.Any()).Return(nil)
+
+	result, err := health_check.NewService(manager).CheckReadiness(context.Background())
+
+	if err != nil {
+		t.Fatalf("CheckReadiness() error = %v, want nil", err)
+	}
+	if result.Status != "ready" {
+		t.Fatalf("CheckReadiness() status = %q, want %q", result.Status, "ready")
 	}
 }

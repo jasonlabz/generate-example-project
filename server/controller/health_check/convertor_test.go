@@ -7,7 +7,7 @@ import (
 )
 
 func TestToHealthCheckOutput(t *testing.T) {
-	output := toHealthCheckOutput(service.HealthCheckResult{Status: "ready"})
+	output := toHealthCheckOutput(service.Result{Status: "ready"})
 
 	if output == nil || output.Body == nil {
 		t.Fatal("toHealthCheckOutput() returned nil output")

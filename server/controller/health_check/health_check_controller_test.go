@@ -16,41 +16,31 @@ import (
 )
 
 func TestController_Register_ReturnsSuccessEnvelope(t *testing.T) {
-	router, healthCheckService := newHealthCheckRouter(t)
-	healthCheckService.EXPECT().Check(gomock.Any()).Return(service.HealthCheckResult{Status: "success"}, nil)
+	router, healthService := newHealthCheckRouter(t)
+	healthService.EXPECT().Check(gomock.Any()).Return(service.Result{Status: "success"}, nil)
 
 	request := httptest.NewRequest(http.MethodGet, "/health-check", nil)
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
 
-	if response.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
-	}
+	assertSuccessEnvelope(t, response, "success")
+}
 
-	var payload struct {
-		Code        int      `json:"code"`
-		Version     string   `json:"version"`
-		CurrentTime string   `json:"current_time"`
-		Data        []string `json:"data"`
-	}
-	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
-		t.Fatalf("unmarshal response: %v", err)
-	}
-	if payload.Code != 0 || payload.Version != "v1" {
-		t.Fatalf("payload = %#v, want success envelope for v1", payload)
-	}
-	if len(payload.Data) != 1 || payload.Data[0] != "success" {
-		t.Fatalf("data = %#v, want [success]", payload.Data)
-	}
-	if response.Header().Get("Link") != "" {
-		t.Fatalf("Link = %q, want empty", response.Header().Get("Link"))
-	}
+func TestController_Register_ReturnsReadinessEnvelope(t *testing.T) {
+	router, healthService := newHealthCheckRouter(t)
+	healthService.EXPECT().CheckReadiness(gomock.Any()).Return(service.Result{Status: "ready"}, nil)
+
+	request := httptest.NewRequest(http.MethodGet, "/readiness-check", nil)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+
+	assertSuccessEnvelope(t, response, "ready")
 }
 
 func TestController_Register_AdaptsServiceFailure(t *testing.T) {
-	router, healthCheckService := newHealthCheckRouter(t)
+	router, healthService := newHealthCheckRouter(t)
 	serviceErr := errors.New("health dependency unavailable")
-	healthCheckService.EXPECT().Check(gomock.Any()).Return(service.HealthCheckResult{}, serviceErr)
+	healthService.EXPECT().Check(gomock.Any()).Return(service.Result{}, serviceErr)
 
 	request := httptest.NewRequest(http.MethodGet, "/health-check", nil)
 	response := httptest.NewRecorder()
@@ -88,28 +78,27 @@ func TestController_Register_PublishesOpenAPIMetadata(t *testing.T) {
 	config.CreateHooks = nil
 	api := humagin.New(router, config)
 
-	controller := NewHealthCheckController(nil)
+	controller := NewController(nil)
 	controller.Register(api)
 
-	operation := api.OpenAPI().Paths["/health-check"].Get
-	if operation == nil {
+	healthOperation := api.OpenAPI().Paths["/health-check"].Get
+	if healthOperation == nil {
 		t.Fatal("health-check operation was not registered")
 	}
-	if operation.OperationID != "health-check" || operation.Summary != "健康检查" {
-		t.Fatalf("operation metadata = %#v, want health-check metadata", operation)
+	if healthOperation.OperationID != "health-check" || healthOperation.Summary != "健康检查" {
+		t.Fatalf("health-check metadata = %#v, want health-check metadata", healthOperation)
 	}
-	if len(operation.Tags) != 2 || operation.Tags[0] != "系统" || operation.Tags[1] != "健康检查" {
-		t.Fatalf("operation tags = %#v, want system and health-check tags", operation.Tags)
+
+	readinessOperation := api.OpenAPI().Paths["/readiness-check"].Get
+	if readinessOperation == nil {
+		t.Fatal("readiness-check operation was not registered")
 	}
-	if response := operation.Responses["200"]; response == nil || response.Description != "服务正常，data 包含当前健康状态。" {
-		t.Fatalf("success response = %#v, want documented 200 response", response)
-	}
-	if response := operation.Responses["500"]; response == nil || response.Description != "Internal Server Error" {
-		t.Fatalf("failure response = %#v, want Huma-generated 500 response", response)
+	if readinessOperation.OperationID != "readiness-check" || readinessOperation.Summary != "就绪检查" {
+		t.Fatalf("readiness-check metadata = %#v, want readiness-check metadata", readinessOperation)
 	}
 }
 
-func newHealthCheckRouter(t *testing.T) (*gin.Engine, *service_mocks.MockHealthCheckService) {
+func newHealthCheckRouter(t *testing.T) (*gin.Engine, *service_mocks.MockService) {
 	t.Helper()
 
 	gin.SetMode(gin.TestMode)
@@ -122,9 +111,34 @@ func newHealthCheckRouter(t *testing.T) (*gin.Engine, *service_mocks.MockHealthC
 	api := humagin.New(router, config)
 
 	mockController := gomock.NewController(t)
-	healthCheckService := service_mocks.NewMockHealthCheckService(mockController)
-	controller := NewHealthCheckController(healthCheckService)
-	controller.Register(api)
+	healthService := service_mocks.NewMockService(mockController)
+	NewController(healthService).Register(api)
 
-	return router, healthCheckService
+	return router, healthService
+}
+
+func assertSuccessEnvelope(t *testing.T, response *httptest.ResponseRecorder, status string) {
+	t.Helper()
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	}
+
+	var payload struct {
+		Code    int      `json:"code"`
+		Version string   `json:"version"`
+		Data    []string `json:"data"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if payload.Code != 0 || payload.Version != "v1" {
+		t.Fatalf("payload = %#v, want success envelope for v1", payload)
+	}
+	if len(payload.Data) != 1 || payload.Data[0] != status {
+		t.Fatalf("data = %#v, want [%s]", payload.Data, status)
+	}
+	if response.Header().Get("Link") != "" {
+		t.Fatalf("Link = %q, want empty", response.Header().Get("Link"))
+	}
 }

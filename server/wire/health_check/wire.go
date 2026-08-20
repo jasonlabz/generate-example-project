@@ -7,20 +7,11 @@ import (
 	service "github.com/jasonlabz/generate-example-project/server/service/health_check"
 )
 
-// NewHealthCheckController assembles the production liveness-check controller.
-func NewHealthCheckController() controller.HealthCheckController {
+// NewController assembles the production health-check Controller.
+func NewController() *controller.Controller {
 	probe := manager.NewLocalProbe()
-	checkManager := manager.NewHealthCheckManager(probe)
-	checkService := service.NewHealthCheckService(checkManager)
+	checkManager := manager.NewManager(probe)
+	checkService := service.NewService(checkManager)
 
-	return controller.NewHealthCheckController(checkService)
-}
-
-// NewReadinessCheckController assembles the production readiness-check controller.
-func NewReadinessCheckController() controller.ReadinessCheckController {
-	probe := manager.NewLocalProbe()
-	checkManager := manager.NewReadinessCheckManager(probe)
-	checkService := service.NewReadinessCheckService(checkManager)
-
-	return controller.NewReadinessCheckController(checkService)
+	return controller.NewController(checkService)
 }

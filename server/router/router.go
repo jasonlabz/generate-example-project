@@ -114,8 +114,7 @@ func rootMiddleware(r *gin.Engine, middlewares ...gin.HandlerFunc) {
 
 // registerRootAPI registers all module routes served from the server API.\
 func registerRootAPI(api huma.API, middleware ...huma.Middlewares) {
-	health_check.NewHealthCheckController().Register(api)
-	health_check.NewReadinessCheckController().Register(api)
+	health_check.NewController().Register(api)
 }
 
 // registerBaseAPI 注册服务基础路由：http(s)://ip:port/<服务名>/**

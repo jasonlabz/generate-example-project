@@ -7,22 +7,31 @@ import (
 	"github.com/jasonlabz/generate-example-project/server/manager/health_check"
 )
 
-type healthCheckServiceImpl struct {
-	manager health_check.HealthCheckManager
+type serviceImpl struct {
+	manager health_check.Manager
 }
 
-var _ HealthCheckService = (*healthCheckServiceImpl)(nil)
+var _ Service = (*serviceImpl)(nil)
 
-// NewHealthCheckService creates a HealthCheckService backed by manager.
-func NewHealthCheckService(manager health_check.HealthCheckManager) HealthCheckService {
-	return &healthCheckServiceImpl{manager: manager}
+// NewService creates a Service backed by manager.
+func NewService(manager health_check.Manager) Service {
+	return &serviceImpl{manager: manager}
 }
 
-// Check reports a manager failure with service-level context.
-func (s *healthCheckServiceImpl) Check(ctx context.Context) (HealthCheckResult, error) {
+// Check reports a liveness dependency failure with service-level context.
+func (s *serviceImpl) Check(ctx context.Context) (Result, error) {
 	if err := s.manager.Check(ctx); err != nil {
-		return HealthCheckResult{}, fmt.Errorf("check health: %w", err)
+		return Result{}, fmt.Errorf("check health: %w", err)
 	}
 
-	return HealthCheckResult{Status: "success"}, nil
+	return Result{Status: "success"}, nil
+}
+
+// CheckReadiness reports a readiness dependency failure with service-level context.
+func (s *serviceImpl) CheckReadiness(ctx context.Context) (Result, error) {
+	if err := s.manager.CheckReadiness(ctx); err != nil {
+		return Result{}, fmt.Errorf("check readiness: %w", err)
+	}
+
+	return Result{Status: "ready"}, nil
 }

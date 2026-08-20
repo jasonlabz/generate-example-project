@@ -3,12 +3,8 @@ package health_check
 
 import "context"
 
-// HealthCheckService performs the application health check.
-type HealthCheckService interface {
-	Check(ctx context.Context) (HealthCheckResult, error)
-}
-
-// ReadinessCheckService verifies whether the application can accept traffic.
-type ReadinessCheckService interface {
-	Check(ctx context.Context) (ReadinessCheckResult, error)
+// Service provides the health-check use cases for the HTTP layer.
+type Service interface {
+	Check(ctx context.Context) (Result, error)
+	CheckReadiness(ctx context.Context) (Result, error)
 }

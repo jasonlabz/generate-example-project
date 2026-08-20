@@ -16,14 +16,8 @@ func TestManager_Check(t *testing.T) {
 		probeErr error
 		wantErr  error
 	}{
-		{
-			name: "success",
-		},
-		{
-			name:     "wraps probe error",
-			probeErr: errors.New("probe unavailable"),
-			wantErr:  errors.New("probe unavailable"),
-		},
+		{name: "success"},
+		{name: "wraps probe error", probeErr: errors.New("probe unavailable"), wantErr: errors.New("probe unavailable")},
 	}
 
 	for _, test := range tests {
@@ -32,7 +26,7 @@ func TestManager_Check(t *testing.T) {
 			probe := manager_mocks.NewMockHealthProbe(ctrl)
 			probe.EXPECT().Probe(gomock.Any()).Return(test.probeErr)
 
-			err := health_check.NewHealthCheckManager(probe).Check(context.Background())
+			err := health_check.NewManager(probe).Check(context.Background())
 
 			if test.wantErr == nil {
 				if err != nil {
@@ -44,6 +38,18 @@ func TestManager_Check(t *testing.T) {
 				t.Fatalf("Check() error = %v, want wrapped %v", err, test.probeErr)
 			}
 		})
+	}
+}
+
+func TestManager_CheckReadiness(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	probe := manager_mocks.NewMockHealthProbe(ctrl)
+	probe.EXPECT().Probe(gomock.Any()).Return(nil)
+
+	err := health_check.NewManager(probe).CheckReadiness(context.Background())
+
+	if err != nil {
+		t.Fatalf("CheckReadiness() error = %v, want nil", err)
 	}
 }
 

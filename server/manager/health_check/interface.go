@@ -3,14 +3,10 @@ package health_check
 
 import "context"
 
-// HealthCheckManager coordinates the health-check dependencies.
-type HealthCheckManager interface {
+// Manager coordinates the dependencies used by health-check use cases.
+type Manager interface {
 	Check(ctx context.Context) error
-}
-
-// ReadinessCheckManager coordinates readiness-check dependencies.
-type ReadinessCheckManager interface {
-	Check(ctx context.Context) error
+	CheckReadiness(ctx context.Context) error
 }
 
 // HealthProbe checks the availability of one health-check dependency.
