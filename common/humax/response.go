@@ -1,4 +1,4 @@
-// Package humax provides Huma response envelopes, pagination, and file streams.
+// Package humax provides Huma response envelopes, error mapping, pagination, and file streams.
 package humax
 
 import (
@@ -8,7 +8,6 @@ import (
 	"io"
 	"io/fs"
 	"mime"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -58,7 +57,7 @@ func Success[T any](version string, data T) *Output[T] {
 // Result returns a successful response or a status-aware Huma error.
 func Result[T any](version string, data T, err error) (*Output[T], error) {
 	if err != nil {
-		return nil, InternalServerError(version, err)
+		return nil, MapError(version, err)
 	}
 	return Success(version, data), nil
 }
@@ -123,41 +122,9 @@ func PaginationSuccess[T any](version string, data T, pagination *Pagination) *P
 // PaginationResult returns a paginated response or a status-aware Huma error.
 func PaginationResult[T any](version string, data T, err error, pagination *Pagination) (*PaginationOutput[T], error) {
 	if err != nil {
-		return nil, InternalServerError(version, err)
+		return nil, MapError(version, err)
 	}
 	return PaginationSuccess(version, data, pagination), nil
-}
-
-// Error is a uniform error response that implements huma.StatusError.
-type Error struct {
-	*Envelope[[]any]
-	status int
-	cause  error
-}
-
-// InternalServerError converts an unexpected error into a 500 response.
-func InternalServerError(version string, cause error) *Error {
-	if cause == nil {
-		cause = errors.New(http.StatusText(http.StatusInternalServerError))
-	}
-	return &Error{
-		Envelope: NewError(version, []any{}, 0, cause.Error(), cause.Error()),
-		status:   http.StatusInternalServerError,
-		cause:    cause,
-	}
-}
-
-// Error implements error.
-func (e *Error) Error() string {
-	if e == nil || e.cause == nil {
-		return ""
-	}
-	return e.cause.Error()
-}
-
-// GetStatus implements huma.StatusError.
-func (e *Error) GetStatus() int {
-	return e.status
 }
 
 // FileDownloadConfig configures a streamed file response.
@@ -195,7 +162,7 @@ func File(version string, config *FileDownloadConfig) (*huma.StreamResponse, err
 
 	reader, closeReader, contentLength, err := openFileSource(&fileConfig)
 	if err != nil {
-		return nil, InternalServerError(version, err)
+		return nil, MapError(version, err)
 	}
 
 	return &huma.StreamResponse{Body: func(ctx huma.Context) {

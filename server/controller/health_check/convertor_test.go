@@ -6,16 +6,13 @@ import (
 	service "github.com/jasonlabz/generate-example-project/server/service/health_check"
 )
 
-func TestToHealthCheckOutput(t *testing.T) {
-	output := toHealthCheckOutput(service.Result{Status: "ready"})
+func TestToHealthCheckData(t *testing.T) {
+	data := toHealthCheckData(service.Result{Status: "ready"})
 
-	if output == nil || output.Body == nil {
-		t.Fatal("toHealthCheckOutput() returned nil output")
+	if data == nil {
+		t.Fatal("toHealthCheckData() returned nil")
 	}
-	if output.Body.Version != "v1" {
-		t.Fatalf("version = %q, want %q", output.Body.Version, "v1")
-	}
-	if len(output.Body.Data) != 1 || output.Body.Data[0] != "ready" {
-		t.Fatalf("data = %#v, want [ready]", output.Body.Data)
+	if len(*data) != 1 || (*data)[0] != "ready" {
+		t.Fatalf("data = %#v, want [ready]", *data)
 	}
 }

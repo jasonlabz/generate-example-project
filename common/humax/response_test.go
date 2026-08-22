@@ -5,13 +5,16 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	humav2 "github.com/danielgtaylor/huma/v2"
+	"github.com/danielgtaylor/huma/v2/adapters/humagin"
 	"github.com/danielgtaylor/huma/v2/humatest"
+	"github.com/gin-gonic/gin"
 	"github.com/jasonlabz/generate-example-project/common/humax"
 )
 
@@ -44,11 +47,154 @@ func TestInternalServerError_UsesLegacyEnvelope(t *testing.T) {
 	if err := json.Unmarshal(encoded, &payload); err != nil {
 		t.Fatalf("unmarshal Huma error: %v", err)
 	}
-	if payload["message"] != "probe unavailable" {
-		t.Fatalf("message = %#v, want probe unavailable", payload["message"])
+	if payload["message"] != http.StatusText(http.StatusInternalServerError) {
+		t.Fatalf("message = %#v, want %q", payload["message"], http.StatusText(http.StatusInternalServerError))
 	}
 	if _, ok := payload["data"]; !ok {
 		t.Fatal("data is missing from Huma error")
+	}
+	if _, ok := payload["err_trace"]; ok {
+		t.Fatal("err_trace must not expose the internal error")
+	}
+}
+
+func TestWrap_MapsUnexpectedErrorToSafeEnvelope(t *testing.T) {
+	_, api := humatest.New(t)
+	humav2.Get(api, "/failure", humax.Wrap("v1", func(context.Context, *struct{}) (*string, error) {
+		return nil, errors.New("database password is invalid")
+	}))
+
+	response := api.Get("/failure")
+	if response.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusInternalServerError)
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if payload["message"] != http.StatusText(http.StatusInternalServerError) {
+		t.Fatalf("message = %#v, want %q", payload["message"], http.StatusText(http.StatusInternalServerError))
+	}
+	if _, ok := payload["err_trace"]; ok {
+		t.Fatal("err_trace must not expose the internal error")
+	}
+}
+
+func TestWrap_PreservesSharedBusinessError(t *testing.T) {
+	_, api := humatest.New(t)
+	humav2.Get(api, "/missing", humax.Wrap("v1", func(context.Context, *struct{}) (*string, error) {
+		return nil, humax.BusinessError("v1", 1001, "resource not found")
+	}))
+
+	response := api.Get("/missing")
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if payload["code"] != float64(1001) || payload["message"] != "resource not found" {
+		t.Fatalf("payload = %#v, want shared not-found envelope", payload)
+	}
+}
+
+func TestConfigureHumaErrorFactory_UsesEnvelopeForInvalidRequest(t *testing.T) {
+	originalFactory := humav2.NewErrorWithContext
+	originalError := humav2.NewError
+	t.Cleanup(func() {
+		humav2.NewErrorWithContext = originalFactory
+		humav2.NewError = originalError
+	})
+	humax.ConfigureHumaErrorFactory("v1")
+
+	router := gin.New()
+	config := humav2.DefaultConfig("test", "v1")
+	config.DocsPath = ""
+	config.OpenAPIPath = ""
+	config.SchemasPath = ""
+	config.CreateHooks = nil
+	api := humagin.New(router, config)
+	humav2.Post(api, "/validation", func(context.Context, *struct {
+		Body struct {
+			Name string `json:"name" minLength:"1"`
+		}
+	}) (*struct{}, error) {
+		return &struct{}{}, nil
+	})
+
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/validation", nil))
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if payload["code"] != float64(1) {
+		t.Fatalf("code = %#v, want 1", payload["code"])
+	}
+	if payload["message"] == "" {
+		t.Fatal("message is empty")
+	}
+	if _, ok := payload["err_trace"]; ok {
+		t.Fatal("err_trace must not be present for validation errors")
+	}
+}
+
+func TestConfigureHumaErrorFactory_PreservesInternalServerError(t *testing.T) {
+	originalFactory := humav2.NewErrorWithContext
+	originalError := humav2.NewError
+	t.Cleanup(func() {
+		humav2.NewErrorWithContext = originalFactory
+		humav2.NewError = originalError
+	})
+	humax.ConfigureHumaErrorFactory("v1")
+
+	errorResponse := humav2.NewErrorWithContext(nil, http.StatusInternalServerError, "database password is invalid")
+	if errorResponse.GetStatus() != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", errorResponse.GetStatus(), http.StatusInternalServerError)
+	}
+	encoded, err := json.Marshal(errorResponse)
+	if err != nil {
+		t.Fatalf("marshal Huma error: %v", err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(encoded, &payload); err != nil {
+		t.Fatalf("unmarshal Huma error: %v", err)
+	}
+	if payload["message"] != http.StatusText(http.StatusInternalServerError) {
+		t.Fatalf("message = %#v, want %q", payload["message"], http.StatusText(http.StatusInternalServerError))
+	}
+	if _, ok := payload["err_trace"]; ok {
+		t.Fatal("err_trace must not expose the internal error")
+	}
+}
+
+func TestConfigureHumaErrorFactory_UsesEnvelopeForOpenAPIErrorSchema(t *testing.T) {
+	originalFactory := humav2.NewErrorWithContext
+	originalError := humav2.NewError
+	t.Cleanup(func() {
+		humav2.NewErrorWithContext = originalFactory
+		humav2.NewError = originalError
+	})
+	humax.ConfigureHumaErrorFactory("v1")
+
+	errorResponse := humav2.NewError(0, "")
+	encoded, err := json.Marshal(errorResponse)
+	if err != nil {
+		t.Fatalf("marshal Huma error: %v", err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(encoded, &payload); err != nil {
+		t.Fatalf("unmarshal Huma error: %v", err)
+	}
+	if payload["code"] != float64(1) || payload["version"] != "v1" {
+		t.Fatalf("payload = %#v, want shared error envelope", payload)
 	}
 }
 

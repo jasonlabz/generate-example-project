@@ -60,7 +60,7 @@ docs/                      设计文档、开发过程记录
 // huma.Register 三要素：
 //  1. api：huma.API 或 huma.NewGroup（组自动应用前缀）；
 //  2. huma.Operation：OpenAPI 元信息（Summary/Tags/OperationID）；
-//  3. handler：func(ctx context.Context, in *In) (*Out, error)。
+//  3. handler：humax.Wrap 负责统一成功/错误信封。
 func (c *controllerImpl) Register(api huma.API) {
 	huma.Register(api, huma.Operation{
 		OperationID: "user-get",
@@ -68,7 +68,7 @@ func (c *controllerImpl) Register(api huma.API) {
 		Path:        "/users/{id}",        // 路径参数用 {name} 占位
 		Summary:     "获取用户",
 		Tags:        []string{"用户"},
-	}, c.handleGet)
+	}, humax.Wrap(consts.APIVersionV1, c.handleGet))
 }
 ```
 
@@ -80,21 +80,19 @@ type getUserInput struct {
 	ID int64 `path:"id" example:"1"`     // path/query/header/body 四类位置
 }
 
-type userOutput struct {
-	Body *humax.Envelope[*userVO]        // 响应体统一用 humax.Envelope
-}
+// 成功响应由 humax.Wrap 自动封装为 Envelope[*userVO]，无需重复定义 output。
 ```
 
 ### 3. 处理器：`<module>_controller.go`
 
 ```go
-// handleGet 是 huma 处理器：入参结构体、出参结构体、error（状态码）。
-func (c *controllerImpl) handleGet(ctx context.Context, in *getUserInput) (*userOutput, error) {
+// handleGet 只负责用例调用与 DTO 转换；协议错误由 Wrap 统一映射。
+func (c *controllerImpl) handleGet(ctx context.Context, in *getUserInput) (*userVO, error) {
 	user, err := c.service.GetUser(ctx, in.ID)
 	if err != nil {
-		return nil, humax.NotFoundError(consts.APIVersionV1, err)  // 带状态码的错误
+		return nil, err
 	}
-	return &userOutput{Body: humax.New(consts.APIVersionV1, toUserVO(user))}, nil
+	return toUserVO(user), nil
 }
 ```
 
@@ -147,8 +145,8 @@ func registerV1GroupAPI(api huma.API, middleware ...huma.Middlewares) {
 | `@ID` | `Operation.OperationID` |
 | `@Accept` / `@Produce` | `Operation.ContentTypes`（默认 application/json） |
 | `@Param` | 请求结构体字段 huma tag（`path`/`query`/`header`/`body`） |
-| `@Success` | 出参结构体（`Body` 字段 + `humax.Envelope`） |
-| `@Failure` | error + `huma.StatusError`（见 `common/humax.Error`） |
+| `@Success` | `humax.Wrap` 推导的出参（统一为 `humax.Envelope`） |
+| `@Failure` | error + `humax.BusinessError`（见 `common/humax.Error`） |
 | `@Router` | `Operation.Method` + `Operation.Path` |
 
 ## 注意事项（写代码前必读）
@@ -169,10 +167,14 @@ func registerV1GroupAPI(api huma.API, middleware ...huma.Middlewares) {
 
 ### 错误与响应
 
-- handler 返回的 error **必须携带状态码**（实现 `huma.StatusError` 的
-  `GetStatus() int`），否则 huma 默认按 200/500 处理。
-- 错误统一走 `common/humax.Error`（信封 + 状态码）；需要新状态码时仿照
-  `InternalServerError` 增加构造函数。
+- Controller handler 返回原始业务数据与 error，并由 `humax.Wrap` 统一生成成功信封、
+  保留 `humax.BusinessError` 创建的业务错误，或把未知错误映射为安全的 500 信封。
+- 需要明确的业务失败时，Controller 返回 `humax.BusinessError(version, code, message)`；
+  它会返回 HTTP 200 与非零业务 code。不要直接返回 Huma 内置错误，避免重新落入 RFC7807 响应格式。
+- `humax.ConfigureHumaErrorFactory` 必须在创建 Huma API 前于 Router 中调用；参数校验
+  错误因此也返回相同 Envelope（HTTP 200、code=1）。
+- 未知内部错误的原始 cause 仅保留在服务端调用链中；如需记录日志由上层负责，不能写入
+  `message` 或 `err_trace`；对外使用稳定的 `Internal Server Error`。
 - 成功响应统一 `humax.Envelope`（版本 + code/message/data）。
 
 ### 中间件

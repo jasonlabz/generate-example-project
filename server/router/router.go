@@ -22,6 +22,7 @@ import (
 	knife "github.com/jasonlabz/knife4go"
 
 	"github.com/jasonlabz/generate-example-project/bootstrap"
+	"github.com/jasonlabz/generate-example-project/common/humax"
 	"github.com/jasonlabz/generate-example-project/server/wire/health_check"
 	_middleware "github.com/jasonlabz/potato/middleware"
 )
@@ -66,10 +67,15 @@ func InitApiRouter() (*gin.Engine, error) {
 	humaConfig.OpenAPIPath = ""
 	humaConfig.SchemasPath = ""
 	humaConfig.CreateHooks = nil
+	// 所有 API 响应均回退至 JSON，避免协商失败返回非约定的 406。
+	humaConfig.NoFormatFallback = false
 
 	// —— 请求约束 ——
 	// 请求体大小上限与读取超时在 Operation 或 huma.Config 层面按需设置；
 	// 单接口级别可参考 controller 中 Operation.MaxBodyBytes 的注释示例。
+
+	// 在创建 Huma API 前统一安装校验错误工厂，避免默认 RFC7807 响应泄漏到调用方。
+	humax.ConfigureHumaErrorFactory("v1")
 
 	// humagin.New 把 gin.Engine 适配为 huma.API：huma 路由注册在 gin 之上，
 	// 两者共享同一 HTTP 服务。

@@ -8,6 +8,9 @@ import (
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
+
+	"github.com/jasonlabz/generate-example-project/common/consts"
+	"github.com/jasonlabz/generate-example-project/common/humax"
 )
 
 // Register registers all HTTP operations maintained by the health-check Controller.
@@ -24,7 +27,7 @@ func (c *Controller) Register(api huma.API) {
 		Responses: map[string]*huma.Response{
 			"200": {Description: "服务正常，data 包含当前健康状态。"},
 		},
-	}, c.handleHealthCheck)
+	}, humax.Wrap(consts.APIVersionV1, c.handleHealthCheck))
 
 	huma.Register(api, huma.Operation{
 		OperationID:   "readiness-check",
@@ -38,5 +41,5 @@ func (c *Controller) Register(api huma.API) {
 		Responses: map[string]*huma.Response{
 			"200": {Description: "服务已就绪，data 包含当前就绪状态。"},
 		},
-	}, c.handleReadinessCheck)
+	}, humax.Wrap(consts.APIVersionV1, c.handleReadinessCheck))
 }

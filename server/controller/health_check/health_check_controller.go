@@ -3,8 +3,6 @@ package health_check
 import (
 	"context"
 
-	"github.com/jasonlabz/generate-example-project/common/consts"
-	"github.com/jasonlabz/generate-example-project/common/humax"
 	"github.com/jasonlabz/generate-example-project/server/service/health_check"
 )
 
@@ -18,22 +16,22 @@ func NewController(service health_check.Service) *Controller {
 	return &Controller{service: service}
 }
 
-// handleHealthCheck converts the liveness use case to the HTTP response contract.
-func (c *Controller) handleHealthCheck(ctx context.Context, _ *struct{}) (*healthCheckOutput, error) {
+// handleHealthCheck converts the liveness use case to controller response data.
+func (c *Controller) handleHealthCheck(ctx context.Context, _ *struct{}) (*[]string, error) {
 	result, err := c.service.Check(ctx)
 	if err != nil {
-		return nil, humax.InternalServerError(consts.APIVersionV1, err)
+		return nil, err
 	}
 
-	return toHealthCheckOutput(result), nil
+	return toHealthCheckData(result), nil
 }
 
-// handleReadinessCheck converts the readiness use case to the HTTP response contract.
-func (c *Controller) handleReadinessCheck(ctx context.Context, _ *struct{}) (*healthCheckOutput, error) {
+// handleReadinessCheck converts the readiness use case to controller response data.
+func (c *Controller) handleReadinessCheck(ctx context.Context, _ *struct{}) (*[]string, error) {
 	result, err := c.service.CheckReadiness(ctx)
 	if err != nil {
-		return nil, humax.InternalServerError(consts.APIVersionV1, err)
+		return nil, err
 	}
 
-	return toHealthCheckOutput(result), nil
+	return toHealthCheckData(result), nil
 }

@@ -60,11 +60,19 @@ func TestController_Register_AdaptsServiceFailure(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}
-	if payload.Code != 0 || payload.Message != serviceErr.Error() || payload.ErrTrace != serviceErr.Error() {
-		t.Fatalf("payload = %#v, want legacy error envelope", payload)
+	if payload.Code != 0 || payload.Message != http.StatusText(http.StatusInternalServerError) || payload.ErrTrace != "" {
+		t.Fatalf("payload = %#v, want safe error envelope", payload)
 	}
 	if payload.Version != "v1" || payload.Data == nil {
 		t.Fatalf("payload = %#v, want version v1 and empty data", payload)
+	}
+
+	var rawPayload map[string]json.RawMessage
+	if err := json.Unmarshal(response.Body.Bytes(), &rawPayload); err != nil {
+		t.Fatalf("unmarshal raw response: %v", err)
+	}
+	if _, ok := rawPayload["err_trace"]; ok {
+		t.Fatal("err_trace must not expose the service error")
 	}
 }
 

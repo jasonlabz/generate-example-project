@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/danielgtaylor/huma/v2"
 	"github.com/gin-gonic/gin"
 
 	"github.com/jasonlabz/generate-example-project/bootstrap"
@@ -19,6 +20,13 @@ import (
 // 注册文档端点，因此测试需在调用前覆盖这两处全局状态。
 func newTestAPIRouter(t *testing.T, debug bool) *gin.Engine {
 	t.Helper()
+
+	originalFactory := huma.NewErrorWithContext
+	originalError := huma.NewError
+	t.Cleanup(func() {
+		huma.NewErrorWithContext = originalFactory
+		huma.NewError = originalError
+	})
 
 	bootstrap.GetConfig().Application.Name = "example"
 
@@ -86,6 +94,50 @@ func TestInitApiRouter_HealthCheck(t *testing.T) {
 	}
 	if len(response.Data) != 1 || response.Data[0] != "success" {
 		t.Errorf("GET /health-check data = %#v, want []string{\"success\"}", response.Data)
+	}
+}
+
+func TestInitApiRouter_ConfiguresHumaValidationEnvelope(t *testing.T) {
+	originalFactory := huma.NewErrorWithContext
+	t.Cleanup(func() { huma.NewErrorWithContext = originalFactory })
+	newTestAPIRouter(t, false)
+
+	errorResponse := huma.NewErrorWithContext(nil, http.StatusBadRequest, "request body is required")
+	encoded, err := json.Marshal(errorResponse)
+	if err != nil {
+		t.Fatalf("marshal Huma error: %v", err)
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(encoded, &payload); err != nil {
+		t.Fatalf("unmarshal Huma error: %v", err)
+	}
+	if errorResponse.GetStatus() != http.StatusOK {
+		t.Fatalf("status = %d, want %d", errorResponse.GetStatus(), http.StatusOK)
+	}
+	if payload["code"] != float64(1) {
+		t.Fatalf("code = %#v, want 1", payload["code"])
+	}
+	if payload["version"] != "v1" {
+		t.Fatalf("version = %#v, want v1", payload["version"])
+	}
+	if _, ok := payload["err_trace"]; ok {
+		t.Fatal("err_trace must not be present for validation errors")
+	}
+}
+
+func TestInitApiRouter_FallsBackToJSONForUnsupportedAccept(t *testing.T) {
+	router := newTestAPIRouter(t, false)
+	request := httptest.NewRequest(http.MethodGet, "/health-check", nil)
+	request.Header.Set("Accept", "application/xml")
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("GET /health-check status = %d, want %d", recorder.Code, http.StatusOK)
+	}
+	if contentType := recorder.Header().Get("Content-Type"); contentType != "application/json" {
+		t.Fatalf("Content-Type = %q, want application/json", contentType)
 	}
 }
 

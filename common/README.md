@@ -20,6 +20,6 @@ common/
 ## 关键约定
 
 - **响应信封**：所有 HTTP 响应统一 `humax.Envelope[T]`（成功 `humax.New`、错误 `humax.NewError`）。
-- **huma 错误**：handler 错误必须携带状态码（`humax.Error` 实现 `huma.StatusError`），
-  新状态码构造函数仿照 `humax.InternalServerError` 增加。
+- **huma 错误**：预期业务失败使用 `humax.BusinessError`（HTTP 200 + 非零 code），
+  未知内部错误由 `humax.MapError` 统一映射为安全的 HTTP 500。
 - 详见 [humax/README.md](humax/README.md)。
