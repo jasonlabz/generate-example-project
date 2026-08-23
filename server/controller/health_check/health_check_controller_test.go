@@ -96,6 +96,7 @@ func TestController_Register_PublishesOpenAPIMetadata(t *testing.T) {
 	if healthOperation.OperationID != "health-check" || healthOperation.Summary != "健康检查" {
 		t.Fatalf("health-check metadata = %#v, want health-check metadata", healthOperation)
 	}
+	assertOperationStatusContract(t, healthOperation.Responses)
 
 	readinessOperation := api.OpenAPI().Paths["/readiness-check"].Get
 	if readinessOperation == nil {
@@ -103,6 +104,20 @@ func TestController_Register_PublishesOpenAPIMetadata(t *testing.T) {
 	}
 	if readinessOperation.OperationID != "readiness-check" || readinessOperation.Summary != "就绪检查" {
 		t.Fatalf("readiness-check metadata = %#v, want readiness-check metadata", readinessOperation)
+	}
+	assertOperationStatusContract(t, readinessOperation.Responses)
+}
+
+func assertOperationStatusContract(t *testing.T, responses map[string]*huma.Response) {
+	t.Helper()
+
+	for status := range responses {
+		if status != "200" && status != "500" {
+			t.Errorf("documented status = %s, want only 200 or 500", status)
+		}
+	}
+	if responses["200"] == nil || responses["500"] == nil {
+		t.Errorf("documented responses = %#v, want both 200 and 500", responses)
 	}
 }
 

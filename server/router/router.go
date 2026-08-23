@@ -20,11 +20,11 @@ import (
 	"github.com/danielgtaylor/huma/v2/adapters/humagin"
 	"github.com/gin-gonic/gin"
 	knife "github.com/jasonlabz/knife4go"
+	_middleware "github.com/jasonlabz/potato/middleware"
 
 	"github.com/jasonlabz/generate-example-project/bootstrap"
 	"github.com/jasonlabz/generate-example-project/common/humax"
 	"github.com/jasonlabz/generate-example-project/server/wire/health_check"
-	_middleware "github.com/jasonlabz/potato/middleware"
 )
 
 // InitApiRouter 根据全局配置组装 API 路由，返回 gin.Engine。
@@ -69,6 +69,8 @@ func InitApiRouter() (*gin.Engine, error) {
 	humaConfig.CreateHooks = nil
 	// 所有 API 响应均回退至 JSON，避免协商失败返回非约定的 406。
 	humaConfig.NoFormatFallback = false
+	// 字段默认可选，与旧 Gin binding:"required" 语义对齐；必填字段显式用 required:"true" 标记。
+	humaConfig.FieldsOptionalByDefault = true
 
 	// —— 请求约束 ——
 	// 请求体大小上限与读取超时在 Operation 或 huma.Config 层面按需设置；
@@ -87,6 +89,16 @@ func InitApiRouter() (*gin.Engine, error) {
 	serverAPI := huma.NewGroup(rooterAPI, "/"+serverConfig.GetName())
 	registerBaseAPI(serverAPI)
 
+	// 版本化 API 组：/api/v1 前缀，业务模块（如用户、任务等）在此注册。
+	apiGroup := huma.NewGroup(serverAPI, "/api")
+
+	v1Group := huma.NewGroup(apiGroup, "/v1")
+	registerV1GroupAPI(v1Group)
+
+	// 新增版本：创建 /v2 组并注册对应模块（示例，按需启用）。
+	//v2Group := huma.NewGroup(apiGroup, "/v2")
+	//registerV1GroupAPI(v2Group, modules...)
+
 	// 文档注册（仅调试模式）：把 serverAPI 生成的 OpenAPI 3.0 文档透传给
 	// knife4go。展示与调试请求直接使用文档中的完整路径，必须放在所有路由注册之后，保证文档包含完整路由。
 	// 接口文档地址：http(s)://ip:port/<服务名>/doc.html
@@ -100,16 +112,6 @@ func InitApiRouter() (*gin.Engine, error) {
 			return nil, fmt.Errorf("initialize knife4go documentation: %w", err)
 		}
 	}
-
-	// 版本化 API 组：/api/v1 前缀，业务模块（如用户、任务等）在此注册。
-	apiGroup := huma.NewGroup(serverAPI, "/api")
-
-	v1Group := huma.NewGroup(apiGroup, "/v1")
-	registerV1GroupAPI(v1Group)
-
-	// 新增版本：创建 /v2 组并注册对应模块（示例，按需启用）。
-	//v2Group := huma.NewGroup(apiGroup, "/v2")
-	//registerV1GroupAPI(v2Group, modules...)
 	return router, nil
 }
 

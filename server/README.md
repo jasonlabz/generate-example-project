@@ -46,7 +46,8 @@ Controller 不写业务逻辑，Service 不依赖 Gin。新增模块在 `server/
 - 路由用 `huma.Register(api, huma.Operation{...}, handler)` 注册，`Operation` 字段对应 swag 注解（对照表见根 README）。
 - 请求/响应模型：结构体 + huma tag（`path`/`query`/`header`/`body`）+ 统一响应信封 `humax.Envelope`。
 - 预期错误返回 `common/humax.BusinessError`（HTTP 200 + 非零 code）；未知错误交由
-  `humax.Wrap` 映射为安全的 HTTP 500。
+  `humax.Wrap` / `humax.WrapPage` 映射为安全的 HTTP 500。Operation 的成功状态固定为 200，
+  仅声明 500 错误状态；参数校验与业务错误仍使用 200 的 Envelope。
 - 控制器规范见 [controller/README.md](controller/README.md)。
 
 ## 相关文档

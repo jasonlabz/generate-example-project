@@ -17,7 +17,10 @@ server/controller/<module>/
 - 默认使用具体 `Controller` 和 `NewController(service.Service) *Controller`，不为了调用 `Register` 额外定义接口或私有实现。
 - `Register(api)` 可以在一次调用中注册本业务域的多个 path；每个 handler 调用 Service 的对应方法。
 - 当调用方确实需要替换多种 Controller 实现时，才抽取最小接口。
-- handler 签名：`func(ctx context.Context, in *In) (*Out, error)`。
+- 普通 handler 签名：`func(ctx context.Context, in *In) (*Out, error)`，注册时使用 `humax.Wrap`。
+- 分页 handler 签名：`func(ctx context.Context, in *In) (*[]Out, *humax.Pagination, error)`，注册时使用 `humax.WrapPage`。
+- Operation 必须声明 `DefaultStatus: http.StatusOK` 和 `Errors: []int{http.StatusInternalServerError}`；业务/校验错误由 Envelope 的非零 `code` 表达。
+- query 筛选参数不传时不筛选；只有业务不能执行的参数添加 `required:"true"`。分页统一 `page=1`、`page_size=200`，且 `page_size` 最大为 200。
 - 业务错误统一转换为 `humax` 的带状态码错误；转换逻辑集中在 `convertor.go`，handler 保持简洁。
 
 完整模板与 swag→huma 对照见[根目录 README](../../README.md)。

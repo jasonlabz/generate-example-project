@@ -17,7 +17,7 @@ func NewController(service health_check.Service) *Controller {
 }
 
 // handleHealthCheck converts the liveness use case to controller response data.
-func (c *Controller) handleHealthCheck(ctx context.Context, _ *struct{}) (*[]string, error) {
+func (c *Controller) handleHealthCheck(ctx context.Context, _ *struct{}) ([]string, error) {
 	result, err := c.service.Check(ctx)
 	if err != nil {
 		return nil, err
@@ -27,7 +27,7 @@ func (c *Controller) handleHealthCheck(ctx context.Context, _ *struct{}) (*[]str
 }
 
 // handleReadinessCheck converts the readiness use case to controller response data.
-func (c *Controller) handleReadinessCheck(ctx context.Context, _ *struct{}) (*[]string, error) {
+func (c *Controller) handleReadinessCheck(ctx context.Context, _ *struct{}) ([]string, error) {
 	result, err := c.service.CheckReadiness(ctx)
 	if err != nil {
 		return nil, err

@@ -9,10 +9,7 @@ import (
 func TestToHealthCheckData(t *testing.T) {
 	data := toHealthCheckData(service.Result{Status: "ready"})
 
-	if data == nil {
-		t.Fatal("toHealthCheckData() returned nil")
-	}
-	if len(*data) != 1 || (*data)[0] != "ready" {
-		t.Fatalf("data = %#v, want [ready]", *data)
+	if len(data) != 1 || data[0] != "ready" {
+		t.Fatalf("data = %#v, want [ready]", data)
 	}
 }

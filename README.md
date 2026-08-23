@@ -61,13 +61,15 @@ docs/                      设计文档、开发过程记录
 //  1. api：huma.API 或 huma.NewGroup（组自动应用前缀）；
 //  2. huma.Operation：OpenAPI 元信息（Summary/Tags/OperationID）；
 //  3. handler：humax.Wrap 负责统一成功/错误信封。
-func (c *controllerImpl) Register(api huma.API) {
+func (c *Controller) Register(api huma.API) {
 	huma.Register(api, huma.Operation{
 		OperationID: "user-get",
 		Method:      http.MethodGet,
 		Path:        "/users/{id}",        // 路径参数用 {name} 占位
 		Summary:     "获取用户",
 		Tags:        []string{"用户"},
+		DefaultStatus: http.StatusOK,
+		Errors:        []int{http.StatusInternalServerError},
 	}, humax.Wrap(consts.APIVersionV1, c.handleGet))
 }
 ```
@@ -77,17 +79,30 @@ func (c *controllerImpl) Register(api huma.API) {
 ```go
 // 请求参数结构体用 huma tag 声明位置与校验，huma 自动生成 OpenAPI 参数。
 type getUserInput struct {
-	ID int64 `path:"id" example:"1"`     // path/query/header/body 四类位置
+	ID int64 `path:"id" minimum:"1" example:"1"` // path/query/header/body 四类位置
 }
 
 // 成功响应由 humax.Wrap 自动封装为 Envelope[*userVO]，无需重复定义 output。
+```
+
+查询参数必须按业务语义区分：筛选条件不传表示“不限定”，不要加 `required`；只有接口
+无法执行时才加 `required:"true"`。`minimum` / `maximum` 只校验已提供的值，不能代替必填。
+分页列表统一采用第一页、每页 200 条的默认值，并限制最大页大小为 200：
+
+```go
+type listUsersInput struct {
+	TenantID string `query:"tenant_id" required:"true" minLength:"1" doc:"租户标识"`
+	Keyword  string `query:"keyword" doc:"姓名或账号筛选；不传不筛选"`
+	Page     int64  `query:"page" default:"1" minimum:"1" doc:"页码"`
+	PageSize int64  `query:"page_size" default:"200" minimum:"1" maximum:"200" doc:"每页条数"`
+}
 ```
 
 ### 3. 处理器：`<module>_controller.go`
 
 ```go
 // handleGet 只负责用例调用与 DTO 转换；协议错误由 Wrap 统一映射。
-func (c *controllerImpl) handleGet(ctx context.Context, in *getUserInput) (*userVO, error) {
+func (c *Controller) handleGet(ctx context.Context, in *getUserInput) (*userVO, error) {
 	user, err := c.service.GetUser(ctx, in.ID)
 	if err != nil {
 		return nil, err
@@ -95,6 +110,19 @@ func (c *controllerImpl) handleGet(ctx context.Context, in *getUserInput) (*user
 	return toUserVO(user), nil
 }
 ```
+
+列表接口返回数据与分页信息，由 `humax.WrapPage` 统一封装：
+
+```go
+func (c *Controller) handleList(ctx context.Context, in *listUsersInput) (*[]userVO, *humax.Pagination, error) {
+	// service 查询与 DTO 转换；错误直接返回。
+}
+
+// 注册时使用 humax.WrapPage(consts.APIVersionV1, c.handleList)。
+```
+
+`Operation.DefaultStatus` 固定为 `http.StatusOK`，`Operation.Errors` 仅声明
+`http.StatusInternalServerError`：业务错误与参数校验都使用 HTTP 200 的 Envelope，未知内部错误才使用 500。
 
 ### 4. 业务层
 
@@ -145,7 +173,7 @@ func registerV1GroupAPI(api huma.API, middleware ...huma.Middlewares) {
 | `@ID` | `Operation.OperationID` |
 | `@Accept` / `@Produce` | `Operation.ContentTypes`（默认 application/json） |
 | `@Param` | 请求结构体字段 huma tag（`path`/`query`/`header`/`body`） |
-| `@Success` | `humax.Wrap` 推导的出参（统一为 `humax.Envelope`） |
+| `@Success` | `humax.Wrap` / `humax.WrapPage` 推导的出参（统一为 `humax.Envelope`） |
 | `@Failure` | error + `humax.BusinessError`（见 `common/humax.Error`） |
 | `@Router` | `Operation.Method` + `Operation.Path` |
 
@@ -167,7 +195,7 @@ func registerV1GroupAPI(api huma.API, middleware ...huma.Middlewares) {
 
 ### 错误与响应
 
-- Controller handler 返回原始业务数据与 error，并由 `humax.Wrap` 统一生成成功信封、
+- Controller handler 返回原始业务数据与 error，并由 `humax.Wrap` 或 `humax.WrapPage` 统一生成成功信封、
   保留 `humax.BusinessError` 创建的业务错误，或把未知错误映射为安全的 500 信封。
 - 需要明确的业务失败时，Controller 返回 `humax.BusinessError(version, code, message)`；
   它会返回 HTTP 200 与非零业务 code。不要直接返回 Huma 内置错误，避免重新落入 RFC7807 响应格式。
