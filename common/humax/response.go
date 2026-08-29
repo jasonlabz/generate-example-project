@@ -14,10 +14,13 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	potatoErrors "github.com/jasonlabz/potato/errors"
+
+	"github.com/jasonlabz/generate-example-project/common/apperr"
 )
 
 // Envelope is the common JSON response body for Huma handlers.
@@ -200,30 +203,20 @@ type Error struct {
 	cause  error
 }
 
-// BusinessError creates a business error that responds with HTTP 200 and a
-// non-zero business code. The frontend uses the body code to distinguish it
-// from successful responses.
-func BusinessError(version string, code int, message string) *Error {
-	if message == "" {
-		message = http.StatusText(http.StatusOK)
-	}
-	return &Error{
-		Envelope: NewError(version, []any{}, code, message, ""),
-		status:   http.StatusOK,
-		cause:    errors.New(message),
-	}
+var exposeErrorDetails atomic.Bool
+
+// ConfigureErrorDetails controls whether internal causes are included in
+// err_trace. It must only be enabled in trusted development environments.
+func ConfigureErrorDetails(expose bool) {
+	exposeErrorDetails.Store(expose)
 }
 
 // InternalServerError converts an unexpected error into a 500 response.
 func InternalServerError(version string, cause error) *Error {
 	if cause == nil {
-		cause = errors.New(http.StatusText(http.StatusInternalServerError))
+		cause = errors.New(apperr.Internal.Message())
 	}
-	return &Error{
-		Envelope: NewError(version, []any{}, 0, http.StatusText(http.StatusInternalServerError), ""),
-		status:   http.StatusInternalServerError,
-		cause:    cause,
-	}
+	return newCatalogError(version, apperr.Internal, apperr.Internal.WithErr(cause), cause)
 }
 
 // FromError maps a service error to a shared error envelope.
@@ -237,7 +230,9 @@ func FromError(version string, err error) *Error {
 	}
 	var ex potatoErrors.IError
 	if errors.As(err, &ex) {
-		return BusinessError(version, ex.Code(), ex.Message())
+		if spec, ok := apperr.Lookup(ex.Code()); ok {
+			return newCatalogError(version, spec, ex, ex)
+		}
 	}
 	return InternalServerError(version, err)
 }
@@ -251,14 +246,31 @@ func MapError(version string, err error) error {
 // Call it once during router setup before registering operations.
 func ConfigureHumaErrorFactory(version string) {
 	newError := func(status int, message string, details ...error) huma.StatusError {
-		if status >= http.StatusInternalServerError {
+		spec := apperr.ForHTTPStatus(status)
+		if spec.HTTPStatus >= http.StatusInternalServerError {
 			return InternalServerError(version, errors.New(message))
 		}
-		return BusinessError(version, 1, validationMessage(message, details))
+		return newCatalogError(version, spec, spec.WithMessage(validationMessage(message, details)), nil)
 	}
 	huma.NewError = newError
 	huma.NewErrorWithContext = func(_ huma.Context, status int, message string, details ...error) huma.StatusError {
 		return newError(status, message, details...)
+	}
+}
+
+func newCatalogError(version string, spec apperr.Spec, mapped potatoErrors.IError, cause error) *Error {
+	message := mapped.Message()
+	if spec.HTTPStatus >= http.StatusInternalServerError {
+		message = spec.Message()
+	}
+	trace := ""
+	if cause != nil && spec.HTTPStatus >= http.StatusInternalServerError && exposeErrorDetails.Load() {
+		trace = cause.Error()
+	}
+	return &Error{
+		Envelope: NewError(version, []any{}, spec.Code(), message, trace),
+		status:   spec.HTTPStatus,
+		cause:    cause,
 	}
 }
 

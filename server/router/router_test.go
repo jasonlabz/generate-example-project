@@ -112,11 +112,11 @@ func TestInitApiRouter_ConfiguresHumaValidationEnvelope(t *testing.T) {
 	if err := json.Unmarshal(encoded, &payload); err != nil {
 		t.Fatalf("unmarshal Huma error: %v", err)
 	}
-	if errorResponse.GetStatus() != http.StatusOK {
-		t.Fatalf("status = %d, want %d", errorResponse.GetStatus(), http.StatusOK)
+	if errorResponse.GetStatus() != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", errorResponse.GetStatus(), http.StatusBadRequest)
 	}
-	if payload["code"] != float64(1) {
-		t.Fatalf("code = %#v, want 1", payload["code"])
+	if payload["code"] != float64(100001001) {
+		t.Fatalf("code = %#v, want 100001001", payload["code"])
 	}
 	if payload["version"] != "v1" {
 		t.Fatalf("version = %#v, want v1", payload["version"])

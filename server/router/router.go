@@ -76,7 +76,8 @@ func InitApiRouter() (*gin.Engine, error) {
 	// 请求体大小上限与读取超时在 Operation 或 huma.Config 层面按需设置；
 	// 单接口级别可参考 controller 中 Operation.MaxBodyBytes 的注释示例。
 
-	// 在创建 Huma API 前统一安装校验错误工厂，避免默认 RFC7807 响应泄漏到调用方。
+	// 在创建 Huma API 前统一安装错误详情策略和校验错误工厂，避免默认 RFC7807 响应泄漏到调用方。
+	humax.ConfigureErrorDetails(gin.IsDebugging())
 	humax.ConfigureHumaErrorFactory("v1")
 
 	// humagin.New 把 gin.Engine 适配为 huma.API：huma 路由注册在 gin 之上，

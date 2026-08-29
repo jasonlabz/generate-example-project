@@ -11,6 +11,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humagin"
 	"github.com/gin-gonic/gin"
+	"github.com/jasonlabz/generate-example-project/common/apperr"
 	"github.com/jasonlabz/generate-example-project/common/humax"
 )
 
@@ -171,18 +172,36 @@ func TestFromError_MapsUnexpectedErrorToSafe500Envelope(t *testing.T) {
 	if err = json.Unmarshal(encoded, &payload); err != nil {
 		t.Fatalf("unmarshal error response: %v", err)
 	}
-	if payload["message"] != http.StatusText(http.StatusInternalServerError) {
-		t.Fatalf("message = %#v, want %q", payload["message"], http.StatusText(http.StatusInternalServerError))
+	if payload["code"] != float64(100008001) || payload["message"] != "服务内部错误" {
+		t.Fatalf("payload = %#v, want code 100008001 and safe internal message", payload)
 	}
 	if _, ok := payload["err_trace"]; ok {
 		t.Fatal("err_trace must not expose the internal error")
 	}
 }
 
-func TestBusinessError_UsesHTTP200WithoutTrace(t *testing.T) {
-	output := humax.BusinessError("v1", 403, "permission denied")
-	if output.GetStatus() != http.StatusOK {
-		t.Fatalf("status = %d, want %d", output.GetStatus(), http.StatusOK)
+func TestFromErrorExposesInternalCauseWhenDebugDetailsAreEnabled(t *testing.T) {
+	humax.ConfigureErrorDetails(true)
+	t.Cleanup(func() { humax.ConfigureErrorDetails(false) })
+
+	output := humax.FromError("v1", errors.New("database password is invalid"))
+	encoded, err := json.Marshal(output)
+	if err != nil {
+		t.Fatalf("marshal error response: %v", err)
+	}
+	var payload map[string]any
+	if err = json.Unmarshal(encoded, &payload); err != nil {
+		t.Fatalf("unmarshal error response: %v", err)
+	}
+	if payload["err_trace"] != "database password is invalid" {
+		t.Fatalf("err_trace = %#v, want internal cause", payload["err_trace"])
+	}
+}
+
+func TestFromErrorMapsRegisteredErrorToPublicContract(t *testing.T) {
+	output := humax.FromError("v1", apperr.Forbidden.WithErr(nil))
+	if output.GetStatus() != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", output.GetStatus(), http.StatusForbidden)
 	}
 
 	encoded, err := json.Marshal(output)
@@ -193,11 +212,11 @@ func TestBusinessError_UsesHTTP200WithoutTrace(t *testing.T) {
 	if err = json.Unmarshal(encoded, &payload); err != nil {
 		t.Fatalf("unmarshal business error: %v", err)
 	}
-	if payload["code"] != float64(403) || payload["message"] != "permission denied" {
-		t.Fatalf("payload = %#v, want code 403 and permission message", payload)
+	if payload["code"] != float64(100003001) || payload["message"] != "无权执行此操作" {
+		t.Fatalf("payload = %#v, want forbidden catalog error", payload)
 	}
 	if _, ok := payload["err_trace"]; ok {
-		t.Fatal("err_trace must not expose the business error")
+		t.Fatal("err_trace must not expose the catalog error")
 	}
 }
 
@@ -227,16 +246,16 @@ func TestConfigureHumaErrorFactory_MapsValidationErrorToBusinessEnvelope(t *test
 
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/validation", nil))
-	if response.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
 	}
 
 	var payload map[string]any
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}
-	if payload["code"] != float64(1) {
-		t.Fatalf("code = %#v, want 1", payload["code"])
+	if payload["code"] != float64(100001001) {
+		t.Fatalf("code = %#v, want 100001001", payload["code"])
 	}
 	if _, ok := payload["err_trace"]; ok {
 		t.Fatal("err_trace must not be present for validation errors")
@@ -264,8 +283,8 @@ func TestConfigureHumaErrorFactory_PreservesInternalServerError(t *testing.T) {
 	if err := json.Unmarshal(encoded, &payload); err != nil {
 		t.Fatalf("unmarshal Huma error: %v", err)
 	}
-	if payload["message"] != http.StatusText(http.StatusInternalServerError) {
-		t.Fatalf("message = %#v, want %q", payload["message"], http.StatusText(http.StatusInternalServerError))
+	if payload["code"] != float64(100008001) || payload["message"] != "服务内部错误" {
+		t.Fatalf("payload = %#v, want safe internal error", payload)
 	}
 	if _, ok := payload["err_trace"]; ok {
 		t.Fatal("err_trace must not expose the internal error")
@@ -290,7 +309,7 @@ func TestConfigureHumaErrorFactory_UsesEnvelopeForOpenAPIErrorSchema(t *testing.
 	if err := json.Unmarshal(encoded, &payload); err != nil {
 		t.Fatalf("unmarshal Huma error: %v", err)
 	}
-	if payload["code"] != float64(1) || payload["version"] != "v1" {
+	if payload["code"] != float64(100001001) || payload["version"] != "v1" {
 		t.Fatalf("payload = %#v, want shared error envelope", payload)
 	}
 }

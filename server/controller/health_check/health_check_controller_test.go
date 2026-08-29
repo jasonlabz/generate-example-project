@@ -60,8 +60,8 @@ func TestController_Register_AdaptsServiceFailure(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}
-	if payload.Code != 0 || payload.Message != http.StatusText(http.StatusInternalServerError) || payload.ErrTrace != "" {
-		t.Fatalf("payload = %#v, want safe error envelope", payload)
+	if payload.Code != 100008001 || payload.Message != "服务内部错误" || payload.ErrTrace != "" {
+		t.Fatalf("payload = %#v, want safe internal error envelope", payload)
 	}
 	if payload.Version != "v1" || payload.Data == nil {
 		t.Fatalf("payload = %#v, want version v1 and empty data", payload)
