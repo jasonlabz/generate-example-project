@@ -20,7 +20,7 @@ import (
 	"github.com/jasonlabz/potato/log"
 	"github.com/jasonlabz/potato/utils"
 
-	"icode.baidu.com/baidu/ihcloud/data-fusion-platform/common/resource"
+	"github.com/jasonlabz/generate-example-project/common/resource"
 )
 
 const requestBodyMaxLen = 204800
