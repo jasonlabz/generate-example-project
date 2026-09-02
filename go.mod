@@ -7,7 +7,7 @@ require (
 	github.com/gin-gonic/gin v1.12.0
 	github.com/google/uuid v1.6.0
 	github.com/jasonlabz/knife4go v1.0.1
-	github.com/jasonlabz/potato v1.0.10-0.20260526144952-92b3ea31774d
+	github.com/jasonlabz/potato v1.0.10
 	go.uber.org/mock v0.6.0
 	google.golang.org/grpc v1.81.0
 	gorm.io/gorm v1.26.0

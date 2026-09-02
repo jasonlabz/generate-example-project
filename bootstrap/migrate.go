@@ -98,14 +98,12 @@ func runMigrations(ctx context.Context) {
 
 	unlock, err := acquireMigrationLock(ctx, db, cfg.DBType)
 	if err != nil {
-		resource.Logger.Errorf(ctx, "[migrate] 获取迁移锁失败: %v", err)
-		return
+		panic(fmt.Errorf("[migrate] 获取迁移锁失败: %v", err))
 	}
 	defer unlock()
 
-	if err := db.Exec(migrationTableSQL).Error; err != nil {
-		resource.Logger.Errorf(ctx, "[migrate] 创建追踪表失败: %v", err)
-		return
+	if err = db.Exec(migrationTableSQL).Error; err != nil {
+		panic(fmt.Errorf("[migrate] 创建追踪表失败: %v", err))
 	}
 
 	files := loadMigrations(ctx, "conf/migrations")
@@ -128,13 +126,11 @@ func runMigrations(ctx context.Context) {
 
 	if latest == "" {
 		if baseline == nil {
-			resource.Logger.Error(ctx, "[migrate] 缺少基线文件（文件名需以 00000000_000 开头）")
-			return
+			panic("[migrate] 缺少基线文件（文件名需以 00000000_000 开头）")
 		}
 		resource.Logger.Infof(ctx, "[migrate] 执行基线 %s (版本 %s)", baseline.name, baseline.version)
-		if err := execFile(db, baseline); err != nil {
-			resource.Logger.Errorf(ctx, "[migrate] 基线失败: %v", err)
-			return
+		if err = execFile(db, baseline); err != nil {
+			panic(fmt.Errorf("[migrate] 基线失败: %v", err))
 		}
 		latest = baseline.version
 	}
@@ -145,16 +141,14 @@ func runMigrations(ctx context.Context) {
 		}
 		done, err := isApplied(db, mf.version)
 		if err != nil {
-			resource.Logger.Errorf(ctx, "[migrate] 查询状态失败 %s: %v", mf.name, err)
-			return
+			panic(fmt.Errorf("[migrate] 查询状态失败 %s: %v", mf.name, err))
 		}
 		if done {
 			continue
 		}
 		resource.Logger.Infof(ctx, "[migrate] 执行 %s (版本 %s)", mf.name, mf.version)
-		if err := execFile(db, mf); err != nil {
-			resource.Logger.Errorf(ctx, "[migrate] 迁移失败 %s: %v", mf.name, err)
-			return
+		if err = execFile(db, mf); err != nil {
+			panic(fmt.Errorf("[migrate] 迁移失败 %s: %v", mf.name, err))
 		}
 	}
 }
