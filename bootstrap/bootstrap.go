@@ -31,10 +31,8 @@ func MustInit(ctx context.Context) {
 	ensureDB(ctx)
 	// 初始化DB
 	initDB(ctx)
-	// 自动执行数据库迁移（DDL）
+	// 自动执行数据库迁移和种子数据（先 DDL 后 seed）
 	runMigrations(ctx)
-	// 自动执行种子数据（DDL 完成后）
-	runSeed(ctx)
 	// 初始化RMQ
 	initRMQ(ctx)
 	// 初始化Redis

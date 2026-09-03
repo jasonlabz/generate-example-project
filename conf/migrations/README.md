@@ -8,8 +8,7 @@
 MustInit()
   ├── ensureDB       → 数据库不存在则创建
   ├── initDB         → GORM 连接
-  ├── runMigrations  → DDL 迁移（仅执行一次）
-  └── runSeed        → 种子数据（每次启动都执行）
+  └── runMigrations  → 先执行 DDL，再执行 seed
 ```
 
 ---
@@ -18,24 +17,32 @@ MustInit()
 
 ```
 conf/
-├── migrations/                     ← 表结构迁移（仅 DDL）
-│   ├── 00000000_000_baseline.sql   ← 基线：完整建表快照（仅有这一个）
+├── migrations/                     ← 表结构迁移（DDL）
+│   ├── 00000000_000_baseline.sql   ← 基线：完整建表快照
 │   └── YYYYMMDD_NNN_desc.sql       ← 增量：单次表结构变更
-└── seed/                           ← 种子数据（仅 INSERT）
-    └── NNN_desc.sql                ← 按文件名排序执行
+└── seed/                           ← 种子数据（seed）
+    ├── 00000000_000_baseline.sql   ← 基线：完整种子数据
+    └── YYYYMMDD_NNN_desc.sql       ← 增量：单次种子数据变更
 ```
 
 ---
 
-## 二、版本号解析
+## 二、文件类型与版本号
 
-版本号用于排序、去重、基线比较。系统按以下优先级解析：
+文件类型由所在目录决定，不在 SQL 文件中声明类型：
 
-| 优先级 | 来源 | 说明 |
-|--------|------|------|
-| 1 | `-- @version <版本号>` | 推荐写法，写在文件头部。`--@version` 也支持 |
-| 2 | 文件名前缀 `YYYYMMDD_NNN` | 自动提取，例如 `20240701_001_add_email.sql` → `20240701_001` |
-| — | 以上都拿不到 | 跳过并告警 |
+| 目录 | 类型 |
+|------|------|
+| `conf/migrations/` | `ddl` |
+| `conf/seed/` | `seed` |
+
+版本号用于排序、去重和基线比较：
+
+1. DDL 和 seed 文件名都必须使用 `YYYYMMDD_NNN_desc.sql` 格式。
+2. 普通文件优先使用头部 `-- @version <版本号>`，缺失时从文件名前缀提取
+   `YYYYMMDD_NNN`。
+3. baseline 必须在文件头部使用 `-- @version <版本号>` 声明其覆盖版本。
+4. 无法解析版本号的 SQL 文件会被跳过并告警。
 
 ### 示例
 
@@ -52,9 +59,12 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255);
 
 ### 约定
 
-- 文件名**以 `00000000_000` 开头**，有且仅有一个
+- 文件名**以 `00000000_000` 开头**的 baseline 有且仅有一个
 - 内容是某个时间点的完整建表 SQL
-- 版本号由头部 `-- @version` 声明，代表"此快照已覆盖到该版本"
+- 基线版本由头部 `-- @version` 声明，代表"此快照已覆盖到该版本"
+- `schema_migrations` 由运行时创建，不写入任何 baseline
+- baseline 中的建表、索引和其他对象应使用 `IF NOT EXISTS`；不支持时使用
+  `IF EXISTS` 或条件判断保证可重复执行
 
 ### 基线版本号的含义
 
@@ -80,7 +90,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255);
 执行 20240801_001_add_d.sql     ← > 20240701_005
 ```
 
-**已有库后续启动：** 只执行 `schema_migrations` 中未记录的新文件。
+**已有库后续启动：** 读取 `type=ddl` 的最新版本，只执行版本更高且未记录的新 DDL 文件。
 
 ### 更新基线
 
@@ -94,13 +104,16 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255);
 
 ## 四、种子数据
 
-- 放在 `conf/seed/` 目录，按文件名排序执行
-- **每次启动都在 DDL 之后执行**，不写入 `schema_migrations`
-- INSERT 必须用 `ON CONFLICT ... DO NOTHING` 保证幂等
-- 执行失败不阻塞启动
+- 放在 `conf/seed/` 目录，包含一个 `00000000_000_baseline.sql` 和按版本递增的
+  `YYYYMMDD_NNN_desc.sql`
+- 加载器与 DDL 共用扫描、解析、排序、事务和追踪逻辑，类型由目录决定
+- 新项目部署或没有 `type=seed` 记录时，先执行 seed baseline，再执行版本更高的 seed 文件
+- 已有 seed 记录时，读取 `type=seed` 的最新版本，只执行版本更高且未记录的 seed 文件
+- SQL 必须幂等：默认值可用 `ON CONFLICT ... DO NOTHING`，需要同步内置定义时使用 `ON CONFLICT ... DO UPDATE`
+- seed 执行失败只记录告警，不阻塞服务启动
 
 ```sql
--- conf/seed/001_default_roles.sql
+-- conf/seed/20260903_001_default_roles.sql
 INSERT INTO roles (code, name, description) VALUES
     ('R_SUPER', '超级管理员', '拥有所有权限'),
     ('R_ADMIN', '管理员', '拥有管理权限')
@@ -115,7 +128,8 @@ ON CONFLICT (code) DO NOTHING;
 
 | 字段 | 说明 |
 |------|------|
-| `version` | 解析出的版本号（优先 `-- @version`，兜底文件名前缀） |
+| `version` | 文件中的原始版本号 |
+| `type` | 执行类型：`ddl` 或 `seed`；与 `version` 共同构成唯一记录 |
 | `applied_at` | 执行时间 |
 
 ---
@@ -125,5 +139,5 @@ ON CONFLICT (code) DO NOTHING;
 | 场景 | 做法 |
 |------|------|
 | 新增表 / 修改表结构 | 新建 `YYYYMMDD_NNN_desc.sql`，头部加 `-- @version YYYYMMDD_NNN` |
-| 新增种子数据 | 在 `conf/seed/` 新增 `.sql` 文件 |
+| 新增种子数据 | 在 `conf/seed/` 新建 `YYYYMMDD_NNN_desc.sql`，保证 SQL 可重复执行 |
 | 更新基线 | 导出完整 DDL，替换 `00000000_000_*.sql` |
