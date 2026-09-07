@@ -1,0 +1,366 @@
+# golangci-lint 配置文件（v2 格式）
+# 参考文档：https://golangci-lint.run/docs/
+#
+# 使用方式：
+#   golangci-lint run           # 全量检查（建议提交前跑一遍）
+#   golangci-lint run --fix     # 自动修复能自动修的问题（如 gofmt/goimports）
+#
+# 说明：本项目 lint 目标是"业务团队照抄不改也能有合理的静态检查基线"，
+# 因此启用的都是相对成熟、误报率低、主流社区推荐的 linter，具体见 linters.enable 下的注释。
+
+version: "2"
+
+run:
+  # 分析超时。Default: 1m
+  timeout: 3m
+  # 目标 Go 版本。golangci-lint 自身构建版本必须 >= 此处配置，否则会报：
+  # "the Go language version used to build golangci-lint is lower than the targeted Go version"。
+  go: "1.25"
+
+linters:
+  # default: none + 显式 enable 列表：避免 golangci-lint 版本升级引入新 linter 后
+  # 出现"莫名其妙的新报错"，enable 列表就是这个项目的静态检查基线。
+  default: none
+
+  enable:
+    # ---- 正确性 ----
+    - bodyclose         # 未关闭的 http.Response.Body
+    - errcheck          # 未检查的 error 返回值
+    - errorlint         # error wrap/unwrap 相关问题（%w、errors.Is/As）
+    - govet             # 官方 vet 全家桶（printf、shadow、fieldalignment 等）
+    - ineffassign       # 无效赋值
+    - noctx             # HTTP 请求缺 context
+    - nolintlint        # 无效 / 无用的 nolint 指令
+    - staticcheck       # 官方 staticcheck 集合（v2 中已吸收 gosimple/stylecheck）
+    - unconvert         # 冗余的类型转换
+    - unparam           # 无实际差异的函数参数（永远接同一个值）
+    - unused            # 未使用的常量/变量/函数
+
+    # ---- 安全 ----
+    - gosec             # OWASP 常见安全风险（硬编码密钥/SQL 注入/弱随机等）
+
+    # ---- 代码风格 ----
+    - copyloopvar       # Go 1.22+ 循环变量捕获问题（配合 1.24 使用）
+    - dogsled           # 一次赋值里有 3 个以上 _
+    - gocritic          # 大杂烩：诊断 + 性能 + 风格
+    - goprintffuncname  # printf 风格函数应以 f 结尾
+    - misspell          # 英文拼写
+    - revive            # 更强大的 golint 替代（导出符号 doc、命名规范等）
+    - whitespace        # 多余空白
+
+    # ---- 复杂度 ----
+    - funlen            # 函数过长
+    - gocyclo           # 圈复杂度过高
+
+    # ---- 可维护性 ----
+    - goconst           # 重复字符串应提为常量
+    - lll               # 单行过长
+    - mnd               # 魔法数字
+    - nakedret          # 命名返回值+裸 return
+    - prealloc          # 已知长度的 slice 应 make 预分配
+
+  # 不启用的原因备注：
+  # - asciicheck        # 允许中文注释与错误信息
+  # - depguard          # 依赖治理，需要按业务定制 allow/deny 列表
+  # - dupl              # 误报较多，模板类代码会大量重复
+  # - gochecknoinits    # 项目依赖框架 init 注入 hook
+  # - gochecknoglobals  # 全局单例（resource.LoggerService 等）是刻意为之
+  # - gocognit          # 与 gocyclo 语义重叠
+  # - godot             # 注释末尾必带句号，中英混排下体验差
+  # - godox             # 禁止 TODO/FIXME，与实际开发流程冲突
+  # - err113            # 强制自定义 error 类型，项目已通过 library/errors 集中登记
+  # - gosimple          # v2 已合并进 staticcheck，无需单独启用
+  # - stylecheck        # v2 已合并进 staticcheck，无需单独启用
+  # - typecheck         # v2 内部自动运行，无需显式启用
+  # - interfacer        # 已弃用
+  # - maligned          # 已被 govet 的 fieldalignment 分析器取代
+  # - nestif            # 与 gocyclo/gocognit 语义重叠
+  # - testpackage       # 强制 _test 独立 package，与项目里 gomock 白盒测试冲突
+  # - wsl               # 空白行风格，社区分歧较大
+
+  settings:
+#    # dupl: 代码克隆检测。当前未在 enable 列表中，仅保留阈值配置，方便后续开启。
+#    dupl:
+#      # 触发克隆判定的 token 数阈值。Default: 150
+#      threshold: 100
+
+    # errcheck: 检查未处理的 error 返回值。
+    errcheck:
+      # 说明：errcheck 官方 default 已经覆盖 bytes.Buffer / strings.Builder / hash / fmt 等
+      # 需要时再使用自定义 exclude-functions。参考：https://github.com/kisielk/errcheck#excluding-functions
+      disable-default-exclusions: false
+      # 检查 type assertion `a := b.(MyStruct)` 的 error。Default: false
+      check-type-assertions: true
+      # 检查用 `_` 接收 error 的情况。Default: false
+      # 保持 false，因为项目里 `_ = f()` 常被用作 "我确实不关心此 error" 的显式兜底写法。
+      check-blank: false
+
+    # errorlint: 检查 error wrap/unwrap 相关问题：
+    #   1) 使用 == 对比 err 而不是 errors.Is
+    #   2) fmt.Errorf 里使用了 %s/%v 而不是 %w
+    #   3) type assertion 到 error 类型时未用 errors.As
+    errorlint:
+      errorf: true       # fmt.Errorf 里的 %w 检查
+      asserts: true      # type assertion 检查
+      comparison: true   # == / != 对比 err 的检查
+
+    # funlen: 函数长度检查
+    funlen:
+      lines: 200         # 行数上限。Default: 60
+      statements: 100    # 语句数上限。Default: 40
+
+    # goconst: 重复字符串应提为常量
+    goconst:
+      min-len: 3         # 最小字符串长度。Default: 3
+      min-occurrences: 3 # 最少出现次数。Default: 3
+
+    # gocritic: 覆盖 diagnostic / performance / style 等多个维度。
+    # https://github.com/go-critic/go-critic#usage
+    gocritic:
+      enabled-tags:
+        - diagnostic    # 潜在 bug / 逻辑错误检查，误报率低
+        - performance   # 性能优化建议
+        - style         # 代码风格
+        # - experimental  # 实验性检查，随版本迭代可能新增或移除，升级 gocritic 时留意 diff
+        # - opinionated   # 主观风格倾向性建议（如 builtinShadow），可能与项目习惯冲突
+      disabled-checks:
+        # 检测重复 import；gocritic 已知 bug，同一 package 用不同别名 import 会误报
+        - dupImport     # https://github.com/go-critic/go-critic/issues/845
+        # 建议把长 if-else 链改成 switch；业务代码里链式 if-else 常见且可读，噪音大
+        - ifElseChain
+        # 检测八进制字面量（如 0644 / 0755）；文件权限惯用八进制，误报多
+        - octalLiteral
+        # 要求每个 //nolint 附带说明；已由独立的 nolintlint 承担，避免规则重叠
+        - whyNoLint
+        # 建议把自定义 wrapper 替换成 stdlib 等价函数；主观性强，对项目内薄封装误报多
+        - wrapperFunc
+
+    # gocyclo: 圈复杂度检查
+    gocyclo:
+      min-complexity: 15 # 触发阈值。Default: 30（社区推荐 10 至 20）
+
+    # gosec: Go 语言安全检查器，覆盖 OWASP 常见风险（硬编码密钥、SQL 注入、
+    # 弱随机、不安全的文件权限等）。业务代码新加密码 / 加密 / 文件操作时通常会被它抓到。
+    gosec:
+      # 部分 rule 在测试代码 / 生成代码里会有较多误报，可以在这里 exclude 掉。
+      excludes:
+        - G404          # weak random (math/rand)，demo / 示例代码里常见，不当作阻塞
+
+    # govet: 官方 vet 全家桶
+    govet:
+      # enable-all 会启用绝大多数分析器；不能与 enable 同时使用。
+      # shadow 是 opt-in 分析器，在 enable-all 语义下依然会被启用（v1.55+ 行为）。
+      # 若发现 shadow 未生效，可改为显式 enable 列表。
+      # 注意：enable-all 会启用 fieldalignment，业务 struct 会被要求按内存对齐排字段，
+      # 若噪音过大可改为显式 enable 列表并去掉 fieldalignment。
+      enable-all: true
+      # API DTO 的字段顺序应以可读性和序列化契约为先，不为微小内存节省重排。
+      disable:
+        - fieldalignment
+
+    # lll: 单行过长检查
+    lll:
+      line-length: 160  # 单行字符数上限。Default: 120
+
+    # misspell: 英文拼写检查
+    misspell:
+      locale: US        # 使用 US 拼写标准（如 color 而非 colour）
+      # 注意：golangci-lint v2 的 misspell 不支持 ignore-words；契约字符串（如任务状态 cancelled）用 //nolint:misspell 处理
+
+    # mnd: 魔法数字检查
+    # https://github.com/tommy-muehle/go-mnd/#checks
+    mnd:
+      # Default: ["argument", "case", "condition", "operation", "return", "assign"]
+      # 去掉 operation / assign，业务代码里这两类误报最多
+      checks:
+        - argument
+        - case
+        - condition
+        - return
+      # 不参与分析的数字字面量（"0" / "1" / "0.0" / "1.0" 默认已忽略，无需再列）
+      ignored-numbers:
+        - "0"
+        - "1"
+        - "2"
+        - "3"
+        - '10'
+        - '20'
+        - '100'
+        - "0666"
+        - "0755"
+        - "42"
+      # 这些函数内部用到的数字不算魔法数字
+      ignored-functions:
+        - strings.SplitN
+        - math.*
+        - http.StatusText
+
+    # nolintlint: 检查 //nolint 指令本身的形式是否规范
+    nolintlint:
+      allow-unused: false        # 未生效的 nolint 指令直接报错
+      require-explanation: false # 不强制附带说明（避免与 gocritic.whyNoLint 语义重叠）
+      require-specific: true     # 不强制 //nolint:linterName 精确到具体 linter
+
+    # prealloc: 已知长度的 slice 应 make 预分配，避免多次扩容
+    prealloc:
+      simple: true
+      range-loops: true
+      for-loops: false
+
+    staticcheck:
+      # Checks to enable/disable.
+      # 默认启用全部 staticcheck checks
+      checks:
+        - all
+        # 与 revive 规则重叠的 ST 项，交给 revive，避免同一问题双报
+        - -ST1000   # package doc comment 由 revive.package-comments 承担
+        - -ST1003   # 命名规范由 revive.var-naming 承担
+        - -ST1005   # error 字符串格式由 revive.error-strings 承担
+        - -ST1006   # receiver 命名由 revive.receiver-naming 承担
+        - -ST1008   # error 最后返回位置由 revive.error-return 承担
+        - -ST1012   # error 变量命名由 revive.error-naming 承担
+        - -ST1016   # receiver 命名一致性由 revive.receiver-naming 承担
+        - -ST1020   # 导出函数 doc 格式由 revive.exported 承担
+        - -ST1021   # 导出类型 doc 格式由 revive.exported 承担
+        - -ST1022   # 导出变量 doc 格式由 revive.exported 承担
+
+    # revive: 更强大的 golint 替代，默认规则较宽松；启用一些通用规则即可。
+    # 详细规则清单：https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md
+    revive:
+      rules:
+        - name: var-naming                 # 变量 / 常量命名（MixedCap、ID / URL 等缩写全大写）
+        - name: exported                   # 导出符号必须有 doc comment
+        - name: package-comments           # 包声明必须带 doc comment
+        - name: unused-parameter           # 未用参数（可用 _ 忽略）
+        - name: unreachable-code           # 不可达代码
+        - name: superfluous-else           # 冗余 else
+        - name: indent-error-flow          # if err != nil 分支不应缩进后续正常流
+        - name: errorf                     # 用 fmt.Errorf 而不是 errors.New + fmt.Sprintf
+        - name: early-return               # 早返回优先
+        - name: blank-imports              # `import _ "..."` 必须有解释注释
+        - name: context-as-argument        # ctx context.Context 必须是第一个参数
+        - name: context-keys-type          # context.WithValue 的 key 不能用 string / int 等 builtin 类型
+        - name: error-return               # error 应该是函数返回值列表的最后一个
+        - name: error-strings              # error 字符串不应大写开头 / 不应以标点结尾（Go 官方风格）
+        - name: error-naming               # 错误变量命名 ErrXxx / xxxError；配合你们错误集中登记的做法
+        - name: receiver-naming            # 同一 struct 的 receiver 名字要一致（比如全用 c 或全用 ctrl）
+        - name: unexported-return          # 导出函数不应返回未导出类型（调用方拿到但无法命名）
+        - name: redefines-builtin-id       # 禁止用 len / error / new 等 builtin 名字做变量
+        - name: struct-tag                 # 检查 struct tag 语法（json / yaml / validate 等）
+        - name: unconditional-recursion    # 无终止条件的递归
+        - name: waitgroup-by-value         # sync.WaitGroup 必须传指针（by value 会 copy 导致 Wait 永远不返回）
+        - name: modifies-parameter         # 直接修改传入参数值，常见 bug 源
+        - name: modifies-value-receiver    # 值接收者上修改字段是无效操作
+        - name: use-any                    # Go 1.18+ 用 any 替代 interface{}
+        - name: dot-imports                # 禁止 . import（除 test 包）
+        ### 风格类（可选）
+        - name: if-return                  # `if err != nil { return err }; return nil` 折叠成 `return err`
+        - name: increment-decrement        # x = x + 1 → x++
+        - name: range                      # `for k, v := range m` 里不用 k 就写成 `for _, v`
+        - name: empty-block                # 空的 {} 块
+        - name: useless-break              # switch case 里的多余 break
+        - name: time-naming                # 时间相关变量应该有 time.Duration 类型，而不是 int + 单位后缀
+        - name: identical-branches         # if-else 两个分支体一模一样
+        - name: constant-logical-expr      # x == x、true && x 等恒真恒假表达式
+        - name: bool-literal-in-expr       # x == true 直接写成 x
+        - name: optimize-operands-order    # && / || 短路时把便宜的判断放前面
+        - name: unnecessary-stmt           # 冗余语句（如函数末尾多余的 return）
+        - name: defer                      # defer 的滥用（在 loop 里 defer 等）默认策略即可
+        - name: string-of-int              # string(intValue) 会得到 rune，不是字符串数字（常见 bug）
+        - name: unused-receiver            # 未用的 method receiver，可提示改成函数
+
+  # exclusions: v2 里 issues.exclude-rules 与 issues.exclude-dirs 的合并版
+  exclusions:
+    # 生成代码识别策略：lax = 只需文件里出现 "generated" 等标识就跳过
+    # （默认 strict 会严格要求头部注释满足特定格式）
+    generated: lax
+    # v2 内建的常见排除预设，避免每个项目重复配置
+    presets:
+#      - comments               # 注释相关规则的常见误报（跟revive的exported有冲突
+      - common-false-positives # 社区累计的常见误报
+      - legacy                 # 一些历史遗留的宽容规则
+      - std-error-handling     # stdlib 错误处理相关的宽容规则
+    # 按 path 关闭某些 linter
+    rules:
+      # 测试文件：函数长 / 圈复杂度 / 魔法数字 / errcheck 等强度检查不适用
+      - path: _test\.go
+        linters:
+          - dupl
+          - errcheck
+          - funlen
+          - gocyclo
+          - gosec
+          - govet
+          - mnd
+      # 生成代码：所有 linter 关闭
+      - path: \.gen\.go
+        linters:
+          - all
+      # 单测 mock 目录：所有 linter 关闭
+      - path: mocks/.*\.go
+        linters:
+          - all
+    # 完全跳过的目录（不参与静态检查）
+    paths:
+      - test
+      - bin
+      - conf
+      - conf_online
+      - data
+      - data_online
+      - document
+      - log
+      - release
+      - script
+      - third_party
+      - mocks
+      - infra/dao/model
+      - infra/dao/queries
+      - dal/db/model
+      - dal/db/dao
+      - third_party$
+      - builtin$
+      - examples$
+
+# formatters: v2 把 gofmt / goimports / gci 等格式化类从 linters 中拆到这里
+formatters:
+  enable:
+    - gofmt             # 官方 fmt
+    - goimports         # 自动整理 import 分组与顺序
+#    - gci               # import 分组排序
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/jasonlabz/generate-example-project
+#    # gci: 控制 import 分组顺序，让排序具有确定性
+#    gci:
+#      sections:
+#        - standard      # 标准库
+#        - default       # 未匹配到其它分组的三方包
+#        - prefix(icode.baidu.com/baidu/ihcloud/data-fusion-platform) # 项目内 module 分组（部署到业务项目时替换为实际 module 路径）
+#      section-separators:
+#        - newLine
+#      no-inline-comments: true # import 行内不允许注释
+#      no-prefix-comments: true # import 行上方不允许注释
+  exclusions:
+    generated: lax
+    paths:
+      - test
+      - bin
+      - conf
+      - conf_online
+      - data
+      - data_online
+      - document
+      - hestia
+      - hestia_online
+      - log
+      - release
+      - script
+      - third_party
+      - mocks
+      - infra/dao/model
+      - infra/dao/queries
+      - third_party$
+      - builtin$
+      - examples$
