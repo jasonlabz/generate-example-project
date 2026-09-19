@@ -272,6 +272,7 @@ github.com/jasonlabz/potato v1.0.10-0.20260526144952-92b3ea31774d h1:VgSLioLsJ6D
 github.com/jasonlabz/potato v1.0.10-0.20260526144952-92b3ea31774d/go.mod h1:prKbr7zpslXaTFydP2ghVp0rlvxVEtvOuVvPjpG8TDs=
 github.com/jasonlabz/potato v1.0.10 h1:VayeJT7pIwIz9ELRQEAPJwT7wfVfKnpFYypw/4bsIEs=
 github.com/jasonlabz/potato v1.0.10/go.mod h1:prKbr7zpslXaTFydP2ghVp0rlvxVEtvOuVvPjpG8TDs=
+github.com/jasonlabz/potato v1.0.12/go.mod h1:prKbr7zpslXaTFydP2ghVp0rlvxVEtvOuVvPjpG8TDs=
 github.com/jasonlabz/sqlite v1.11.1 h1:Posd+lfxea1rGcJxYwMPao9sfg2XqKmE4awd35BM5ig=
 github.com/jasonlabz/sqlite v1.11.1/go.mod h1:BCtCDO+MuqIlWuuLEgXKkNqiKnfs9W1OAMauunOQ9hs=
 github.com/jcmturner/aescts/v2 v2.0.0/go.mod h1:AiaICIRyfYg35RUkr8yESTqvSy7csK90qZ5xfvvsoNs=
