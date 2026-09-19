@@ -4,7 +4,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 )
@@ -93,7 +92,7 @@ func newMockgenFixtureProject(t *testing.T) mockgenFixtureProject {
 	binPath := filepath.Join(root, "bin")
 	invocationLog := filepath.Join(root, "mockgen-invocations.log")
 	buildFixtureMockgen(t, root, binPath)
-	return mockgenFixtureProject{root: root, bash: gitBashPath(t), binPath: binPath, invocationLog: invocationLog}
+	return mockgenFixtureProject{root: root, bash: bashPath(t), binPath: binPath, invocationLog: invocationLog}
 }
 
 func copyFixtureFile(t *testing.T, fixtureRoot, relativePath string) {
@@ -186,28 +185,17 @@ func projectRoot(t *testing.T) string {
 	return filepath.Dir(directory)
 }
 
-func gitBashPath(t *testing.T) string {
+// bashPath 返回执行 go-mockgen.sh 所需的 bash。
+// 脚本只面向类 Unix 环境（Linux / macOS / WSL / Git Bash），因此直接从 PATH 查找，
+// 不做平台特定兜底；找不到即视为环境不满足。
+func bashPath(t *testing.T) string {
 	t.Helper()
 
-	if runtime.GOOS != "windows" {
-		path, err := exec.LookPath("bash")
-		if err != nil {
-			t.Fatalf("find bash: %v", err)
-		}
-		return path
+	path, err := exec.LookPath("bash")
+	if err != nil {
+		t.Fatalf("bash is required to run script/go-mockgen.sh: %v", err)
 	}
-
-	for _, path := range []string{
-		filepath.Join(os.Getenv("ProgramFiles"), "Git", "bin", "bash.exe"),
-		filepath.Join(os.Getenv("ProgramFiles(x86)"), "Git", "bin", "bash.exe"),
-	} {
-		if _, err := os.Stat(path); err == nil {
-			return path
-		}
-	}
-
-	t.Fatal("Git Bash is required to run script/go-mockgen.sh on Windows")
-	return ""
+	return path
 }
 
 func assertFakeMockgenInvoked(t *testing.T, fixture mockgenFixtureProject) {

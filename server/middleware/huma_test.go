@@ -12,7 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jasonlabz/potato/consts"
 
-	"github.com/jasonlabz/dagine-dashboard/common/resource"
+	"github.com/jasonlabz/generate-example-project/common/resource"
 )
 
 type humaContextResponse struct {

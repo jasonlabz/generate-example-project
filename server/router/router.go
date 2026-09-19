@@ -25,7 +25,6 @@ import (
 	"github.com/jasonlabz/generate-example-project/bootstrap"
 	"github.com/jasonlabz/generate-example-project/common/humax"
 	"github.com/jasonlabz/generate-example-project/server/middleware"
-	"github.com/jasonlabz/generate-example-project/server/wire/health_check"
 )
 
 // InitApiRouter 根据全局配置组装 API 路由，返回 gin.Engine。
@@ -77,6 +76,10 @@ func InitApiRouter() (*gin.Engine, error) {
 	humax.ConfigureErrorDetails(gin.IsDebugging())
 	humax.ConfigureHumaErrorFactory("v1")
 
+	// 错误链上报：无论响应是否脱敏，服务端日志都保留完整错误链。
+	// 生产环境（debug=false）响应里没有 err_trace，这里是唯一的排查依据。
+	humax.SetErrorReporter(middleware.LogErrorChain)
+
 	// humagin.New 把 gin.Engine 适配为 huma.API：huma 路由注册在 gin 之上，
 	// 两者共享同一 HTTP 服务。
 	rooterAPI := humagin.New(router, humaConfig)
@@ -85,10 +88,12 @@ func InitApiRouter() (*gin.Engine, error) {
 	// serverAPI 是全部业务路由的根组，前缀 /<服务名>：
 	// huma.NewGroup 的组前缀会同时写入路由与 OpenAPI 文档 paths。
 	serverAPI := huma.NewGroup(rooterAPI, "/"+serverConfig.GetName())
+	registerBaseMiddleware(serverAPI)
 	registerBaseAPI(serverAPI)
 
 	// 版本化 API 组：/api/v1 前缀，业务模块（如用户、任务等）在此注册。
 	apiGroup := huma.NewGroup(serverAPI, "/api")
+	registerBaseMiddleware(apiGroup)
 	// 中间件：RecoveryLog 保护包括/api 下的全部路由。
 	apiGroup.UseMiddleware(
 		middleware.HumaRecoveryLog(true),
@@ -97,6 +102,7 @@ func InitApiRouter() (*gin.Engine, error) {
 	)
 
 	v1Group := huma.NewGroup(apiGroup, "/v1")
+	registerV1GroupMiddleware(v1Group)
 	registerV1GroupAPI(v1Group)
 
 	// 新增版本：创建 /v2 组并注册对应模块（示例，按需启用）。
@@ -117,22 +123,4 @@ func InitApiRouter() (*gin.Engine, error) {
 		}
 	}
 	return router, nil
-}
-
-// registerRootAPI registers all module routes served from the server API.\
-func registerRootAPI(api huma.API) {
-	health_check.NewController().Register(api)
-}
-
-// registerBaseAPI 注册服务基础路由：http(s)://ip:port/<服务名>/**
-// 参数 middleware 为 huma 组中间件（huma.Middlewares），需要时传入
-// huma.Group.UseMiddleware 挂载。
-func registerBaseAPI(api huma.API) {
-}
-
-// registerV1GroupAPI 注册版本化业务路由：http(s)://ip:port/<服务名>/api/v1/**
-// 业务模块的控制器（实现 Register(api huma.API) 接口）在此逐个注册。
-func registerV1GroupAPI(api huma.API) {
-	// v1 业务模块在此注册，例如：
-	// user.NewController().Register(api)
 }

@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -57,13 +58,16 @@ func logBytes(src []byte, maxLen int) []byte {
 	return requestBodyLogBytes
 }
 
-// HumaOptions configures SetHumaContext.
+// HumaOptions configures the huma middlewares in this package.
+// 各字段只对消费它的中间件生效：headerMap/customFieldMap 由 SetHumaContext 读取，
+// skipHidden 由 HumaRequestMiddleware 读取。
 type HumaOptions struct {
 	headerMap      map[string]string
 	customFieldMap map[string]func(ctx huma.Context) string
+	skipHidden     bool
 }
 
-// HumaOption customizes SetHumaContext.
+// HumaOption customizes the huma middlewares in this package.
 type HumaOption func(*HumaOptions)
 
 // WithHumaHeaderField copies request headers into the request context.
@@ -77,6 +81,15 @@ func WithHumaHeaderField(headerMap map[string]string) HumaOption {
 func WithHumaCustomField(customFieldMap map[string]func(ctx huma.Context) string) HumaOption {
 	return func(options *HumaOptions) {
 		options.customFieldMap = customFieldMap
+	}
+}
+
+// WithHumaSkipHiddenOperations makes HumaRequestMiddleware skip operations marked
+// Hidden, such as the static assets registered by knife4go. 文档资产不应产生请求日志，
+// 也不应被包装 Writer 捕获响应体（它们不是业务接口）。
+func WithHumaSkipHiddenOperations() HumaOption {
+	return func(options *HumaOptions) {
+		options.skipHidden = true
 	}
 }
 
@@ -155,8 +168,23 @@ func SetHumaContext(opts ...HumaOption) func(ctx huma.Context, next func(huma.Co
 //
 // This middleware is intended for the humagin adapter because it captures the
 // request and response bodies through the underlying Gin context.
-func HumaRequestMiddleware() func(ctx huma.Context, next func(huma.Context)) {
+//
+// 传入 WithHumaSkipHiddenOperations 可跳过 Hidden 操作（如文档静态资产）。
+func HumaRequestMiddleware(opts ...HumaOption) func(ctx huma.Context, next func(huma.Context)) {
 	return func(ctx huma.Context, next func(huma.Context)) {
+		options := &HumaOptions{}
+		for _, opt := range opts {
+			if opt != nil {
+				opt(options)
+			}
+		}
+		// Hidden 操作（knife4go 的 doc.html、静态资源等）不是业务接口，直接放行，
+		// 避免为它们记录日志并替换响应 Writer。
+		if options.skipHidden && ctx.Operation() != nil && ctx.Operation().Hidden {
+			next(ctx)
+			return
+		}
+
 		ginContext := humagin.Unwrap(ctx)
 		requestContext := ctx.Context()
 		traceID := utils.StringValue(requestContext.Value(consts.ContextTraceID))
@@ -257,6 +285,20 @@ func HumaRecoveryLog(stack bool) func(ctx huma.Context, next func(huma.Context))
 
 		next(ctx)
 	}
+}
+
+// LogErrorChain 是 humax.ErrorReporter 的实现：把 handler 返回的完整错误链写入服务端日志。
+//
+// 它补上了响应脱敏后的排查缺口——生产环境（debug=false）不返回 err_trace，而
+// HumaRequestMiddleware 的 error_message 取自 gin.Errors（humagin 适配器不写入，恒为空），
+// 导致 500 的内部原因无处可查。日志携带请求上下文，可自动关联 trace_id。
+//
+// 只记录 5xx：4xx 是可预期的业务失败，由调用方处理，逐条记录会淹没真正的故障信号。
+func LogErrorChain(ctx context.Context, err error, status int) {
+	if status < http.StatusInternalServerError {
+		return
+	}
+	humaLogger().Errorf(ctx, "[humax] internal error (status=%d): %v", status, err)
 }
 
 func humaClientIP(ctx huma.Context) string {

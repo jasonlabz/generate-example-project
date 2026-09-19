@@ -19,4 +19,4 @@ server/manager/<module>/
 - Manager 持有最小化的 DAO/Client 接口；事务在 Manager 的用例边界内协调，DAO 只负责持久化与数据库错误。
 - Manager 测试替换其直接下游 mock；Service 测试只替换 Manager mock。
 
-生产对象由 `server/wire/<module>` 连接为 `dependency -> manager -> service -> controller`。
+生产对象由 `server/wire` 包连接为 `dependency -> manager -> service -> controller`。

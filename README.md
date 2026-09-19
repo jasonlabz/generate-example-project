@@ -22,21 +22,24 @@ main.go                    启动入口：HTTP/GRPC/pprof/Prometheus、优雅退
 bootstrap/                 初始化：配置、日志、DB、迁移、种子数据、RMQ、Redis
 cmd/                       子命令入口（example-server / migrate / tools / worker）
 common/                    跨层通用能力
+├── apperr/                全局错误码目录（code + HTTP 语义 + 公开文案）
 ├── humax/                 huma 响应、分页、文件流与错误封装
-├── ginx/                  gin Context 写入适配（复用 humax 响应类型）
-└── consts/ helper/        常量与辅助函数
+└── consts/ helper/ resource/   常量、辅助函数与全局组件
 server/
 ├── router/router.go       路由组装：huma 组层级 + 中间件 + knife4go 文档
 ├── controller/            控制器层：huma 路由注册 + DTO 定义 + 转换
 ├── service/               服务层：业务逻辑入口（用例编排）
 ├── manager/               技术能力层：外部系统/基础设施访问（DB、Redis 等）
 ├── middleware/            gin 中间件（上下文、日志）
-└── wire/                  依赖组装（NewController/NewService/NewManager）
-mocks/                     mockgen 生成的接口 mock
+└── wire/                  组合根：集中装配各模块对象图（不按模块拆目录）
+mocks/                     mockgen 生成的接口 mock（bash script/go-mockgen.sh）
 conf/                      配置（application.yaml、日志、迁移 SQL）
 script/                    gentol（DAO/Model 生成）、go-mockgen 脚本
 docs/                      设计文档、开发过程记录
 ```
+
+> 各层都以 `health_check`（最小样例）与 `user`（完整样例：参数、分页、文件流、错误码）两个模块作参照，
+> 新增业务模块直接照抄 `user` 的结构。
 
 ### 分层职责（强制）
 
@@ -51,7 +54,8 @@ docs/                      设计文档、开发过程记录
 
 ## Huma 编写规范（新增业务模块模板）
 
-新增模块（如 `user`）按以下步骤，文件结构与 `server/controller/health_check/` 保持一致：
+新增模块按以下步骤。文件结构参照 `server/*/user/`（完整样例：参数、分页、请求体、文件流、错误码），
+`health_check` 是最小样例，只看结构即可：
 
 ### 1. 控制器：`server/controller/<module>/register.go`
 
@@ -114,15 +118,24 @@ func (c *Controller) handleGet(ctx context.Context, in *getUserInput) (*userVO, 
 列表接口返回数据与分页信息，由 `humax.WrapPage` 统一封装：
 
 ```go
-func (c *Controller) handleList(ctx context.Context, in *listUsersInput) (*[]userVO, *humax.Pagination, error) {
-	// service 查询与 DTO 转换；错误直接返回。
+func (c *Controller) handleList(ctx context.Context, in *listUsersInput) ([]userVO, *humax.Pagination, error) {
+	pagination := &humax.Pagination{Page: in.Page, PageSize: in.PageSize}
+	items, total, err := c.service.List(ctx, in.Keyword, pagination.GetOffset(), in.PageSize)
+	if err != nil {
+		return nil, nil, err
+	}
+	pagination.Total = total
+	pagination.GetPageCount()
+	return toUserVOs(items), pagination, nil
 }
 
 // 注册时使用 humax.WrapPage(consts.APIVersionV1, c.handleList)。
 ```
 
-`Operation.DefaultStatus` 固定为 `http.StatusOK`，`Operation.Errors` 仅声明
-`http.StatusInternalServerError`：业务错误与参数校验都使用 HTTP 200 的 Envelope，未知内部错误才使用 500。
+`Operation.DefaultStatus` 固定为 `http.StatusOK`。`Operation.Errors` 声明该接口**实际可能返回**
+的状态码，例如查询单条声明 `[]int{http.StatusNotFound, http.StatusInternalServerError}`：
+业务错误会带上 `apperr` 目录中登记的 HTTP 语义（100004001 → 404），只有未预期的故障才是 500。
+声明齐全才能让 OpenAPI 文档与真实行为一致，前端按文档生成的 client 才不会漏掉分支。
 
 ### 4. 业务层
 
@@ -151,7 +164,8 @@ func (c *Controller) handleList(ctx context.Context, in *listUsersInput) (*[]use
 - `server/service/<module>/<module>_service_impl.go`：默认 Service 实现；独立协作者再以职责命名
 - `server/manager/<module>/`：技术能力层，同样采用「接口 + 实现」形态
 - `server/controller/<module>/`：一个具体 Controller 可维护本域多个 HTTP 操作、DTO 与转换
-- `server/wire/<module>/wire.go`：依赖组装（默认提供 `NewController`）
+- `server/wire/<module>.go`：依赖组装，一个模块一个文件，导出 `New<Module>Controller`
+  （如 `wire/user.go` → `NewUserController`）
 
 ### 5. 注册路由
 
@@ -159,7 +173,7 @@ func (c *Controller) handleList(ctx context.Context, in *listUsersInput) (*[]use
 
 ```go
 func registerV1GroupAPI(api huma.API, middleware ...huma.Middlewares) {
-	user.NewController().Register(api)   // 挂到 /<服务名>/api/v1/**
+	wire.NewUserController().Register(api)   // 挂到 /<服务名>/api/v1/**
 }
 ```
 
@@ -195,15 +209,135 @@ func registerV1GroupAPI(api huma.API, middleware ...huma.Middlewares) {
 
 ### 错误与响应
 
-- Controller handler 返回原始业务数据与 error，并由 `humax.Wrap` 或 `humax.WrapPage` 统一生成成功信封、
-  保留 `humax.BusinessError` 创建的业务错误，或把未知错误映射为安全的 500 信封。
-- 需要明确的业务失败时，Controller 返回 `humax.BusinessError(version, code, message)`；
-  它会返回 HTTP 200 与非零业务 code。不要直接返回 Huma 内置错误，避免重新落入 RFC7807 响应格式。
+响应信封统一为 `humax.Envelope`（版本 + code/message/data），错误响应复用同一结构，不退回 RFC7807。
+HTTP 状态与业务 code 是**双轨**：HTTP 状态让调用方做通用处理，业务 code 让调用方精确定位。
+
+**业务失败用真实的 4xx，不用 HTTP 200。** 两者都能表达失败，选 4xx 的理由：
+
+| 维度 | HTTP 200 + 业务 code | 4xx + 业务 code（本模板） |
+|------|---------------------|--------------------------|
+| 成功率/SLO 指标 | 业务失败被算作成功，告警失真 | 4xx 与 5xx 天然分离 |
+| 网关与客户端重试 | 无法按状态码决策 | 可对 5xx 重试、对 4xx 不重试 |
+| OpenAPI 文档 | 只能描述 200，失败分支丢失 | 失败状态可如实声明 |
+| 前端处理成本 | — | 拦截器已按 status 分流，code 用于细分 |
+
+> 若上游系统强制要求"一律 200"，改 `apperr.Spec.HTTPStatus` 的取值即可，code 体系不受影响；
+> 但请同步接受成功率指标失真的代价。
+
+```text
+成功            HTTP 200  code = 0
+参数校验失败     HTTP 422  code = 100001001   （框架错误，huma 自动映射）
+业务失败         HTTP 404/409/422/403/...      code = 目录中登记的业务码
+未知内部错误     HTTP 500  code = 100008001   （对外恒定文案，不泄漏内部 cause）
+```
+
+> huma 用 **422**（不是 400）表示参数不合法——必填缺失、取值越界、格式错误都走这里。
+> `apperr.ForHTTPStatus` 把框架 422 归到 `InvalidRequest`，同时保留 422 的 HTTP 语义。
+> 否则它会和业务代码主动表达的 `BusinessRule`（同为 422）撞码，调用方无法区分
+> "我参数写错了"和"业务规则不允许"。
+
+- Controller handler 返回原始业务数据与 error，由 `humax.Wrap` / `humax.WrapPage` 统一加壳。
+- **业务失败优先走 `apperr` 目录**（推荐）：service 层返回 `apperr.NotFound.WithMessage(...)`，
+  controller 原样上抛，`humax` 自动映射为目录登记的 HTTP 状态 + code。
+- Controller 层遇到"参数本身合法、但当前组合不被支持"的失败时，用
+  `humax.BusinessError(version, code, message)`：它同样返回统一信封，不落入 RFC7807。
+  未登记的 code 会回退为 `InvalidRequest` 的 HTTP 语义，但保留传入的 code 与 message。
 - `humax.ConfigureHumaErrorFactory` 必须在创建 Huma API 前于 Router 中调用；参数校验
-  错误因此也返回相同 Envelope（HTTP 200、code=1）。
-- 未知内部错误的原始 cause 仅保留在服务端调用链中；如需记录日志由上层负责，不能写入
-  `message` 或 `err_trace`；对外使用稳定的 `Internal Server Error`。
-- 成功响应统一 `humax.Envelope`（版本 + code/message/data）。
+  错误因此返回 HTTP 422 + code 100001001（不是 200）。
+- 未知内部错误对外使用稳定的 `服务内部错误`，不把 cause 写进 `message`。
+
+#### message 与 err_trace 的分工
+
+`message` 是**概括性文案**，给调用方直接展示；`err_trace` 是**详细报错链**，给开发者定位问题。
+
+`humax.ConfigureErrorDetails(true)`（Router 中由 `gin.IsDebugging()` 驱动，即
+`application.debug: true`）打开后，**任何错误都会带上 err_trace**，4xx / 5xx 一视同仁：
+
+```go
+// 5xx：cause 是未知故障，err_trace 含 fmt.Errorf 逐层包装的完整上下文
+fmt.Errorf("query user: %w", dbErr)
+// → message: "服务内部错误"        err_trace: "query user: connection refused: 127.0.0.1:5432"
+
+// 4xx：cause 是 apperr 目录错误，err_trace 含目录 code 与内部原因
+apperr.NotFound.WithErr(errors.New("db: timeout"))
+// → message: "请求的资源不存在"     err_trace: "100004001 -> 请求的资源不存在\n inner error: db: timeout"
+
+// 4xx：只有业务文案、没有内部原因时，回退为目录链，保证调试时看得到来源
+apperr.NotFound.WithMessage("用户 9 不存在")
+// → message: "用户 9 不存在"       err_trace: "100004001 -> 用户 9 不存在"
+
+// controller 主动判定的业务失败
+humax.BusinessError(consts.APIVersionV1, apperr.BusinessRule.Code(), "暂不支持 xlsx 导出")
+// → message: "暂不支持 xlsx 导出"   err_trace: "100006001 -> 暂不支持 xlsx 导出"
+```
+
+关闭开关（生产环境）时 `err_trace` 字段整体省略（`omitempty`），内部原因不出现在响应中。
+
+> 它会把表名、SQL、下游地址等内部细节暴露给调用方，**只能在可信环境开启**——
+> 上线前务必确认 `application.debug: false`。
+> 生产环境需要排查内部原因时，应写入服务端日志而非响应体。
+
+**错误码全链路示范**（见 `server/service/user`、`server/controller/user`）：
+
+```go
+// service：把"记录不存在"这类可预期结果转换为目录中的错误码，而不是 fmt.Errorf 丢掉语义。
+record, exists, err := s.manager.FindByID(ctx, id)
+if err != nil {
+    return User{}, fmt.Errorf("find user %d: %w", id, err)   // 技术故障 → 500
+}
+if !exists {
+    return User{}, apperr.NotFound.WithMessage(fmt.Sprintf("用户 %d 不存在", id))  // 业务失败 → 404
+}
+
+// controller：原样上抛，不做任何转换或包装，错误码才不会在传递中丢失。
+func (c *Controller) handleGet(ctx context.Context, in *getUserInput) (*userVO, error) {
+    item, err := c.service.Get(ctx, in.ID)
+    if err != nil {
+        return nil, err
+    }
+    view := toUserVO(item)
+    return &view, nil
+}
+
+// controller：协议层面的业务失败用 BusinessError（参数合法但组合不支持）。
+if in.Format == "xlsx" {
+    return nil, humax.BusinessError(consts.APIVersionV1, apperr.BusinessRule.Code(), "暂不支持 xlsx 导出")
+}
+```
+
+> **关键点：`%w` 与 `%v` 的区别**。`humax.FromError` 用 `errors.As` 在整条错误链里找
+> `potato/errors.IError`，所以 `fmt.Errorf("...: %w", apperrErr)` 包装后 code 和 HTTP 语义
+> **不会丢**（实测包两层仍然正确映射）。真正会丢的是 `%v`——它把错误降级成字符串，
+> 链断掉之后只能落回 500。
+>
+> ```go
+> fmt.Errorf("get user: %w", apperr.NotFound.WithErr(dbErr))  // → 404 + 100004001 ✅
+> fmt.Errorf("get user: %v", apperr.NotFound.WithErr(dbErr))  // → 500 + 100008001 ❌
+> ```
+>
+> 结论：包装业务错误时坚持用 `%w` 即可，不必为了避免丢码而放弃包装上下文。
+
+#### 错误链的服务端记录
+
+响应里的 `err_trace` 只在 debug 模式出现，生产环境必须靠日志排查。`humax` 通过
+`SetErrorReporter` 把 handler 返回的**原始错误**交出来（响应体已脱敏、`gin.Errors` 又恒为空，
+这是唯一的时机）：
+
+```go
+// server/router/router.go
+humax.SetErrorReporter(middleware.LogErrorChain)
+```
+
+`LogErrorChain` 只记录 5xx（4xx 是可预期的业务失败，逐条记录会淹没故障信号），
+日志携带请求上下文，可自动关联 `trace_id`：
+
+```text
+ERROR	middleware/huma.go:301	[humax] internal error (status=500): query user: connection refused: 127.0.0.1:5432
+```
+
+> 不需要强制要求"返回给 huma 的 error 必须用 potato error 包住"：非 `IError` 的错误会被
+> 安全地兜底成 500（对外恒定文案、不泄漏 cause），而错误链始终会被 `ErrorReporter` 完整记录。
+> 强制包装只会增加形式负担，换不来额外保障。
 
 ### 中间件
 
@@ -254,7 +388,7 @@ bash script/gentol.sh
 bash script/gentol.sh ddl conf/migrations/20240701_001_example_add_column.sql
 ```
 
-PowerShell 使用 `./script/gentol.ps1` 和 `./script/gentol.ps1 ddl <sql文件>`。完整环境变量和参数说明见 [script/README.md](script/README.md)。
+完整环境变量和参数说明见 [script/README.md](script/README.md)。
 
 ### 2、API 文档
 

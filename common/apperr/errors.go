@@ -88,7 +88,11 @@ func ForHTTPStatus(status int) Spec {
 	case http.StatusConflict, http.StatusPreconditionFailed:
 		return Conflict
 	case http.StatusUnprocessableEntity:
-		return BusinessRule
+		// huma 用 422（而非 400）表示请求参数语义不合法，如必填字段缺失、取值越界、
+		// 格式错误。这类框架级错误统一归 InvalidRequest，保留 422 的 HTTP 语义：
+		// 否则它会和业务代码主动表达的 BusinessRule 撞码，调用方无法区分
+		// "我参数写错了"与"业务规则不允许"。
+		return Spec{HTTPStatus: http.StatusUnprocessableEntity, base: InvalidRequest.base}
 	case http.StatusTooManyRequests:
 		return RateLimited
 	default:

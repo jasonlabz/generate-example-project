@@ -1,79 +1,54 @@
+# 仅面向 Linux 部署（linux/amd64、linux/arm64）；不提供 Windows 容器支持。
+# 跨架构构建使用 buildx：docker buildx build --platform linux/arm64 -t <tag> .
+#
 # ============================
-# Stage 1: 构建前端
+# Stage 1: 构建后端
 # ============================
-#FROM iregistry.harbor.local/library/node:20-alpine3.22 AS frontend-builder
-FROM node:20-alpine3.22 AS frontend-builder
+# 内网环境可改用私有仓库镜像：
+#FROM iregistry.harbor.local/library/golang:1.25-bookworm AS backend-builder
+FROM golang:1.25-bookworm AS backend-builder
 
-WORKDIR /app/web
-COPY web/package.json web/pnpm-lock.yaml* ./
-RUN npm install -g pnpm@latest && pnpm install --frozen-lockfile || pnpm install
-COPY web/ .
-RUN pnpm build
-
-# ============================
-# Stage 2: 构建后端
-# ============================
-#FROM iregistry.harbor.local/library/golang:1.26-alpine3.23 AS backend-builder
-FROM golang:1.26-alpine3.23 AS backend-builder
-
-RUN apk add --no-cache gcc musl-dev
-
-WORKDIR /app
+USER work
+WORKDIR /home/work
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 
+# CGO_ENABLED=1 是因为 sqlite 驱动需要 cgo；构建镜像与运行镜像同为 debian 系，
+# 保证 libc 一致（alpine 构建 + debian 运行会因 musl/glibc 不匹配而启动失败）。
+# Go 版本与 go.mod、.golangci.yml 中的 1.25 保持一致。
 RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -o bin/generate-example-project .
 
 # ============================
-# Stage 3: 运行镜像
+# Stage 2: 运行镜像
 # ============================
-#FROM iregistry.harbor.local/library/debian:bullseye-slim
-FROM debian:bullseye-slim
+# 内网环境可改用私有仓库镜像：
+#FROM iregistry.harbor.local/library/debian:bookworm-slim
+FROM debian:bookworm-slim
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends ca-certificates tzdata && \
     ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
     echo "Asia/Shanghai" > /etc/timezone && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+    apt-get clean && rm -rf /var/lib/apt/lists/* \
 
-WORKDIR /app
+USER work
+WORKDIR /home/work
 
-# 后端二进制
-COPY --from=backend-builder /app/bin/generate-example-project ./bin/
-
-# 前端静态文件（从 Stage 1 构建产物复制到 webroot 目录，由 Go 路由 /server/ 提供）
-COPY --from=frontend-builder /app/web/dist ./webroot/
-
-# 配置文件
-COPY --from=backend-builder /app/conf ./conf/
+# 后端二进制与配置目录（服务启动时读取 ./conf/application.yaml）
+COPY --from=backend-builder /home/work/bin/generate-example-project ./bin/
+COPY --from=backend-builder /home/work/conf ./conf/
 
 # 可选目录（如存在则拷入，需取消注释）
-# COPY --from=backend-builder /app/data ./data/
-# COPY --from=backend-builder /app/script ./script/
-# COPY --from=backend-builder /app/docs ./docs/
+# COPY --from=backend-builder /home/work/data ./data/
+# COPY --from=backend-builder /home/work/script ./script/
+# COPY --from=backend-builder /home/work/docs ./docs/
 
-# Go API 服务端口
+# 配置注入：当前版本未实现环境变量覆盖，配置以 conf/application.yaml 为准。
+# 需要按环境注入配置时，把 conf 目录挂为卷，或在启动前渲染该文件：
+#   docker run -v ./conf:/home/work/conf generate-example-project:latest
+
+# HTTP 服务端口（application.server.http.port，默认 8080）
 EXPOSE 8080
-# 前端静态文件服务端口（通过 application.server.static 配置）
-EXPOSE 8081
-
-# 环境变量说明:
-#   DAGINE_DB_HOST          数据库主机 (默认取配置文件)
-#   DAGINE_DB_PORT          数据库端口
-#   DAGINE_DB_USERNAME      数据库用户名
-#   DAGINE_DB_PASSWORD      数据库密码
-#   DAGINE_DB_DATABASE      数据库名
-#   DAGINE_DB_TYPE          数据库类型 (postgres)
-#   DAGINE_DB_DSN           完整 DSN (优先于上述单独字段)
-#   DAGINE_JWT_SECRET       JWT 签名密钥
-#   DAGINE_HTTP_PORT        HTTP 监听端口
-#   DAGINE_STATIC_PATH      前端静态文件目录 (默认 application)
-#   DAGINE_STATIC_PORT      静态文件服务端口 (默认 8081)
-#
-# 前端通过以下两种方式之一提供:
-#   方式1: Go 路由 /server/ 自动提供 webroot/ 目录下的静态文件（默认可用）
-#   方式2: 在 application.yaml 中配置 application.server.static.path 和 port，
-#          启动独立的静态文件服务
 
 ENTRYPOINT ["./bin/generate-example-project"]

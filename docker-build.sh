@@ -1,5 +1,5 @@
 #!/bin/bash
-# Docker 镜像构建脚本
+# Docker 镜像构建脚本（仅构建 Linux 镜像）
 # 用法:
 #   ./docker-build.sh              # 默认构建
 #   ./docker-build.sh -t v1.0.0    # 指定标签
@@ -84,5 +84,5 @@ echo "运行示例:"
 echo "  docker run -d -p 8080:8080 ${FULL_IMAGE}"
 echo ""
 echo "访问地址:"
-echo "  Web:    http://localhost:8080/server/"
-echo "  Health: http://localhost:8080/health-check"
+echo "  Health:    http://localhost:8080/health-check"
+echo "  API 文档:  http://localhost:8080/<服务名>/doc.html  (调试模式)"

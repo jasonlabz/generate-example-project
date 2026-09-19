@@ -24,13 +24,6 @@ normalize_path() {
 	local suffix=''
 	local parent
 
-	if [[ "$path" =~ ^[A-Za-z]:[\\\\/].* ]]; then
-		if ! command -v cygpath >/dev/null 2>&1; then
-			echo "error: Windows path requires cygpath: $path" >&2
-			exit 2
-		fi
-		path="$(cygpath --unix "$path")"
-	fi
 	if [[ "$path" != /* ]]; then
 		path="$project_root/$path"
 	fi

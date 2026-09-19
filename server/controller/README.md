@@ -18,9 +18,13 @@ server/controller/<module>/
 - `Register(api)` 可以在一次调用中注册本业务域的多个 path；每个 handler 调用 Service 的对应方法。
 - 当调用方确实需要替换多种 Controller 实现时，才抽取最小接口。
 - 普通 handler 签名：`func(ctx context.Context, in *In) (*Out, error)`，注册时使用 `humax.Wrap`。
-- 分页 handler 签名：`func(ctx context.Context, in *In) (*[]Out, *humax.Pagination, error)`，注册时使用 `humax.WrapPage`。
-- Operation 必须声明 `DefaultStatus: http.StatusOK` 和 `Errors: []int{http.StatusInternalServerError}`；业务/校验错误由 Envelope 的非零 `code` 表达。
+- 分页 handler 签名：`func(ctx context.Context, in *In) ([]Out, *humax.Pagination, error)`，注册时使用 `humax.WrapPage`。
+- 文件流 handler 直接返回 `*huma.StreamResponse`（用 `humax.File` 构造），不经过 `Wrap`。
+- Operation 必须声明 `DefaultStatus: http.StatusOK`；`Errors` 声明该接口实际会返回的状态码，
+  例如 `[]int{http.StatusNotFound, http.StatusInternalServerError}`，保证文档与行为一致。
 - query 筛选参数不传时不筛选；只有业务不能执行的参数添加 `required:"true"`。分页统一 `page=1`、`page_size=200`，且 `page_size` 最大为 200。
-- 业务错误统一转换为 `humax` 的带状态码错误；转换逻辑集中在 `convertor.go`，handler 保持简洁。
+- handler 不转换错误：service 抛出的 `apperr` 错误原样上抛，由 `humax.Wrap` 统一映射，
+  错误码才不会在传递中丢失。协议层面的业务失败用 `humax.BusinessError`。
+- DTO 转换集中在 `convertor.go`，handler 保持简洁。
 
 完整模板与 swag→huma 对照见[根目录 README](../../README.md)。
