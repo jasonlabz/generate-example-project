@@ -7,10 +7,9 @@ require (
 	github.com/gin-gonic/gin v1.12.0
 	github.com/google/uuid v1.6.0
 	github.com/jasonlabz/knife4go v1.0.2
-	github.com/jasonlabz/potato v1.0.12
+	github.com/jasonlabz/potato v1.1.0
 	go.uber.org/mock v0.6.0
 	google.golang.org/grpc v1.81.0
-	gorm.io/gorm v1.31.1
 )
 
 require (
@@ -114,6 +113,7 @@ require (
 	gorm.io/driver/mysql v1.6.0 // indirect
 	gorm.io/driver/postgres v1.6.0 // indirect
 	gorm.io/driver/sqlserver v1.6.3 // indirect
+	gorm.io/gorm v1.31.1 // indirect
 	gorm.io/plugin/dbresolver v1.6.2 // indirect
 	modernc.org/libc v1.72.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect

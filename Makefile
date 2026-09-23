@@ -25,8 +25,16 @@ prepare:
 
 # compile 阶段，执行编译命令
 compile: build
-build: prepare
+build: prepare build-cmd
 	go build -o $(WORKDIR)/bin/$(TARGETNAME)
+
+# build-cmd 阶段，将 cmd 下所有子命令编译到 bin 目录（按目录名命名二进制）
+build-cmd:
+	for dir in $(shell go list -f '{{.Dir}}' ./cmd/...); do \
+		name=$$(basename $$dir); \
+		echo "build cmd: $$name"; \
+		go build -o $(WORKDIR)/bin/$$name $$dir || exit 1; \
+	done
 
 # test 阶段，进行单元测试
 test: prepare
@@ -52,4 +60,4 @@ clean-middle:
 	rm -rf bin
 
 # avoid filename conflict and speed up build
-.PHONY: all prepare compile test package clean clean-middle build
+.PHONY: all prepare compile test package clean clean-middle build build-cmd

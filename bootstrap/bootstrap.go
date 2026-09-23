@@ -43,6 +43,21 @@ func MustInit(ctx context.Context) {
 	initServicer(ctx)
 }
 
+// MustMigrate 仅初始化数据库迁移所需的最小依赖并执行迁移（先 DDL 后 seed），
+// 供 cmd/migrate 等独立迁移命令使用，不启动 RMQ/Redis/ES 等服务端依赖。
+func MustMigrate(ctx context.Context) {
+	// 初始化配置文件
+	initConfig(ctx)
+	// 初始化日志对象
+	initLogger(ctx)
+	// 确保数据库存在（不存在则创建）
+	ensureDB(ctx)
+	// 初始化DB
+	initDB(ctx)
+	// 自动执行数据库迁移和种子数据（先 DDL 后 seed）
+	runMigrations(ctx)
+}
+
 func initLogger(_ context.Context) {
 	resource.Logger = log.GetLogger()
 }

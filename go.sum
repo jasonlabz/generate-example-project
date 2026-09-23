@@ -156,8 +156,8 @@ github.com/jasonlabz/knife4go v1.0.2 h1:mirmUrzbuaKUlujqbt+rPggGEZfIlIPZ+KYMzqjM
 github.com/jasonlabz/knife4go v1.0.2/go.mod h1:7o/Ecex77JTNzdKchTIHnZ7g6WdsFgrFdvXwC9XmzZY=
 github.com/jasonlabz/oracle v1.1.1-0.20240609161033-cf780c860ebb h1:T+ElDctDdFYlNxJkqJR6TAzTyxSsV/T72spEZ6c1Gq4=
 github.com/jasonlabz/oracle v1.1.1-0.20240609161033-cf780c860ebb/go.mod h1:uoouM4+ZKzkGqOJ6Qor4opYCI0ASU7zB5NqSPmPJ6Fg=
-github.com/jasonlabz/potato v1.0.12 h1:GcOg+wniGaDSH6wj5QQLgqc6Yisa87YAsFzgkU7L/3E=
-github.com/jasonlabz/potato v1.0.12/go.mod h1:prKbr7zpslXaTFydP2ghVp0rlvxVEtvOuVvPjpG8TDs=
+github.com/jasonlabz/potato v1.1.0 h1:e5iZljdpB/ViSiDbA6kXyxFCV31fADOewTm8fWUHq5w=
+github.com/jasonlabz/potato v1.1.0/go.mod h1:prKbr7zpslXaTFydP2ghVp0rlvxVEtvOuVvPjpG8TDs=
 github.com/jasonlabz/sqlite v1.11.1 h1:Posd+lfxea1rGcJxYwMPao9sfg2XqKmE4awd35BM5ig=
 github.com/jasonlabz/sqlite v1.11.1/go.mod h1:BCtCDO+MuqIlWuuLEgXKkNqiKnfs9W1OAMauunOQ9hs=
 github.com/jcmturner/aescts/v2 v2.0.0/go.mod h1:AiaICIRyfYg35RUkr8yESTqvSy7csK90qZ5xfvvsoNs=
