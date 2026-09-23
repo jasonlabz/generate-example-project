@@ -80,8 +80,8 @@ func TestController_Get_MapsNotFoundToHTTPStatus(t *testing.T) {
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/users/7", nil))
 
-	if response.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusNotFound, response.Body.String())
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusOK, response.Body.String())
 	}
 	var payload struct {
 		Code    int    `json:"code"`
@@ -112,8 +112,8 @@ func TestController_Get_ExposesInnerCauseInDebugMode(t *testing.T) {
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/users/7", nil))
 
-	if response.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want %d", response.Code, http.StatusNotFound)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
 	}
 	var payload struct {
 		Code     int    `json:"code"`
@@ -190,8 +190,18 @@ func TestController_Create_MapsConflictToHTTPStatus(t *testing.T) {
 	router.ServeHTTP(response, newJSONRequest(t, http.MethodPost, "/users",
 		`{"name":"alice","email":"alice@example.com"}`))
 
-	if response.Code != http.StatusConflict {
-		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusConflict, response.Body.String())
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusOK, response.Body.String())
+	}
+	var payload struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if payload.Code != apperr.Conflict.Code() {
+		t.Fatalf("code = %d, want %d", payload.Code, apperr.Conflict.Code())
 	}
 }
 
@@ -204,8 +214,8 @@ func TestController_Export_RejectsUnsupportedFormat(t *testing.T) {
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/users/export?format=xlsx", nil))
 
-	if response.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusUnprocessableEntity, response.Body.String())
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusOK, response.Body.String())
 	}
 	var payload struct {
 		Code    int    `json:"code"`

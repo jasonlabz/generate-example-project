@@ -162,8 +162,8 @@ func TestWrap_RegistersWithHuma(t *testing.T) {
 
 func TestFromError_MapsUnexpectedErrorToSafe500Envelope(t *testing.T) {
 	output := humax.FromError("v1", errors.New("database password is invalid"))
-	if output.GetStatus() != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", output.GetStatus(), http.StatusInternalServerError)
+	if output.GetStatus() != http.StatusOK {
+		t.Fatalf("status = %d, want %d", output.GetStatus(), http.StatusOK)
 	}
 
 	encoded, err := json.Marshal(output)
@@ -202,8 +202,8 @@ func TestFromErrorExposesInternalCauseWhenDebugDetailsAreEnabled(t *testing.T) {
 
 func TestFromErrorMapsRegisteredErrorToPublicContract(t *testing.T) {
 	output := humax.FromError("v1", apperr.Forbidden.WithErr(nil))
-	if output.GetStatus() != http.StatusForbidden {
-		t.Fatalf("status = %d, want %d", output.GetStatus(), http.StatusForbidden)
+	if output.GetStatus() != http.StatusOK {
+		t.Fatalf("status = %d, want %d", output.GetStatus(), http.StatusOK)
 	}
 
 	encoded, err := json.Marshal(output)
@@ -224,8 +224,8 @@ func TestFromErrorMapsRegisteredErrorToPublicContract(t *testing.T) {
 
 func TestBusinessError_UsesRegisteredHTTPStatusAndCode(t *testing.T) {
 	output := humax.BusinessError("v1", apperr.NotFound.Code(), "用户不存在")
-	if output.GetStatus() != http.StatusNotFound {
-		t.Fatalf("status = %d, want %d", output.GetStatus(), http.StatusNotFound)
+	if output.GetStatus() != http.StatusOK {
+		t.Fatalf("status = %d, want %d", output.GetStatus(), http.StatusOK)
 	}
 
 	encoded, err := json.Marshal(output)
@@ -246,8 +246,8 @@ func TestBusinessError_UsesRegisteredHTTPStatusAndCode(t *testing.T) {
 
 func TestBusinessError_FallsBackToInvalidRequestForUnregisteredCode(t *testing.T) {
 	output := humax.BusinessError("v1", 999999999, "自定义业务校验失败")
-	if output.GetStatus() != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", output.GetStatus(), http.StatusBadRequest)
+	if output.GetStatus() != http.StatusOK {
+		t.Fatalf("status = %d, want %d", output.GetStatus(), http.StatusOK)
 	}
 
 	encoded, err := json.Marshal(output)
@@ -280,12 +280,17 @@ func TestWrap_PreservesBusinessError(t *testing.T) {
 	}
 
 	// Wrap 内的 MapError 必须原样保留业务错误，不能降级为 500。
-	mapped, ok := err.(*humax.Error)
+	mapped, ok := err.(huma.StatusError)
 	if !ok {
-		t.Fatalf("err type = %T, want *humax.Error", err)
+		t.Fatalf("err type = %T, want huma.StatusError", err)
 	}
-	if mapped.GetStatus() != http.StatusForbidden {
-		t.Fatalf("status = %d, want %d", mapped.GetStatus(), http.StatusForbidden)
+	if mapped.GetStatus() != http.StatusOK {
+		t.Fatalf("status = %d, want %d", mapped.GetStatus(), http.StatusOK)
+	}
+	// HTTP 状态恒为 200，业务失败语义改由 body 的 code 表达。
+	payload := marshalPayload(t, mapped)
+	if payload["code"] != float64(apperr.Forbidden.Code()) {
+		t.Fatalf("code = %#v, want %d", payload["code"], apperr.Forbidden.Code())
 	}
 }
 
@@ -297,8 +302,8 @@ func TestFromError_ExposesFullChainForBusinessErrorInDebugMode(t *testing.T) {
 	output := humax.FromError("v1", apperr.NotFound.WithErr(cause))
 
 	payload := marshalPayload(t, output)
-	if output.GetStatus() != http.StatusNotFound {
-		t.Fatalf("status = %d, want %d", output.GetStatus(), http.StatusNotFound)
+	if output.GetStatus() != http.StatusOK {
+		t.Fatalf("status = %d, want %d", output.GetStatus(), http.StatusOK)
 	}
 	// message 保持概括性文案，详细链放进 err_trace。
 	if payload["message"] != "请求的资源不存在" {
@@ -501,8 +506,8 @@ func TestConfigureHumaErrorFactory_MapsValidationErrorToBusinessEnvelope(t *test
 
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/validation", nil))
-	if response.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
 	}
 
 	var payload map[string]any
@@ -531,8 +536,8 @@ func TestConfigureHumaErrorFactory_MapsFramework422ToInvalidRequest(t *testing.T
 	errorResponse := huma.NewErrorWithContext(nil, http.StatusUnprocessableEntity, "expected number <= 200")
 	payload := marshalPayload(t, errorResponse)
 
-	if errorResponse.GetStatus() != http.StatusUnprocessableEntity {
-		t.Fatalf("status = %d, want %d", errorResponse.GetStatus(), http.StatusUnprocessableEntity)
+	if errorResponse.GetStatus() != http.StatusOK {
+		t.Fatalf("status = %d, want %d", errorResponse.GetStatus(), http.StatusOK)
 	}
 	if payload["code"] != float64(100001001) {
 		t.Fatalf("code = %#v, want 100001001 (InvalidRequest)", payload["code"])
@@ -549,8 +554,8 @@ func TestConfigureHumaErrorFactory_PreservesInternalServerError(t *testing.T) {
 	humax.ConfigureHumaErrorFactory("v1")
 
 	errorResponse := huma.NewErrorWithContext(nil, http.StatusInternalServerError, "database password is invalid")
-	if errorResponse.GetStatus() != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", errorResponse.GetStatus(), http.StatusInternalServerError)
+	if errorResponse.GetStatus() != http.StatusOK {
+		t.Fatalf("status = %d, want %d", errorResponse.GetStatus(), http.StatusOK)
 	}
 	encoded, err := json.Marshal(errorResponse)
 	if err != nil {

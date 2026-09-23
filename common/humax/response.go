@@ -196,8 +196,10 @@ func WrapPage[I, T any](version string, handler func(context.Context, *I) ([]T, 
 	}
 }
 
-// Error is a uniform error response that implements huma.StatusError.
-type Error struct {
+// httpError is a uniform error response that implements huma.StatusError.
+// 它只是 huma 边界上的响应适配器（DTO），不是业务错误类型；业务代码一律使用 potato 的
+// IError（经 apperr 目录产出）。本类型对包外不可见，避免出现"第二种错误定义"。
+type httpError struct {
 	*Envelope[[]any]
 	status int
 	cause  error
@@ -259,11 +261,16 @@ func notifyErrorReporter(ctx context.Context, err error) {
 	reporter(ctx, err, resolveStatus(err))
 }
 
-// resolveStatus 从错误推导即将返回的 HTTP 状态码，与 FromError 的映射保持一致。
+// resolveStatus 从错误推导语义 HTTP 状态码，供 ErrorReporter 判定严重级别。
+// 它读取 apperr 目录登记的语义状态，独立于实际响应状态码——响应恒为 200，
+// 语义状态只用于日志/监控分级（例如只记 5xx）。
 func resolveStatus(err error) int {
-	var statusError huma.StatusError
-	if errors.As(err, &statusError) {
-		return statusError.GetStatus()
+	var sharedError *httpError
+	if errors.As(err, &sharedError) {
+		if spec, ok := apperr.Lookup(sharedError.Code); ok {
+			return spec.HTTPStatus
+		}
+		return http.StatusInternalServerError
 	}
 	var catalogError potatoErrors.IError
 	if errors.As(err, &catalogError) {
@@ -275,7 +282,7 @@ func resolveStatus(err error) int {
 }
 
 // InternalServerError converts an unexpected error into a 500 response.
-func InternalServerError(version string, cause error) *Error {
+func InternalServerError(version string, cause error) huma.StatusError {
 	if cause == nil {
 		cause = errors.New(apperr.Internal.Message())
 	}
@@ -290,7 +297,7 @@ func InternalServerError(version string, cause error) *Error {
 //
 // code 应当取 apperr 中已登记的错误码；传入未登记的 code 时回退为 InvalidRequest 的
 // HTTP 语义，但保留调用方传入的 code 与 message，避免前端拿到无法定位的错误。
-func BusinessError(version string, code int, message string) *Error {
+func BusinessError(version string, code int, message string) huma.StatusError {
 	spec, ok := apperr.Lookup(code)
 	if !ok {
 		spec = apperr.InvalidRequest
@@ -304,18 +311,18 @@ func BusinessError(version string, code int, message string) *Error {
 		// "code -> message" 形式，保证调试时 err_trace 始终有内容可看。
 		trace = fmt.Sprintf("%d -> %s", code, message)
 	}
-	return &Error{
+	return &httpError{
 		Envelope: NewError(version, []any{}, code, message, trace),
-		status:   spec.HTTPStatus,
+		status:   http.StatusOK,
 	}
 }
 
 // FromError maps a service error to a shared error envelope.
-func FromError(version string, err error) *Error {
+func FromError(version string, err error) huma.StatusError {
 	if err == nil {
 		return nil
 	}
-	var sharedError *Error
+	var sharedError *httpError
 	if errors.As(err, &sharedError) {
 		return sharedError
 	}
@@ -349,7 +356,7 @@ func ConfigureHumaErrorFactory(version string) {
 	}
 }
 
-func newCatalogError(version string, spec apperr.Spec, mapped potatoErrors.IError, cause error) *Error {
+func newCatalogError(version string, spec apperr.Spec, mapped potatoErrors.IError, cause error) *httpError {
 	message := mapped.Message()
 	if spec.HTTPStatus >= http.StatusInternalServerError {
 		message = spec.Message()
@@ -358,9 +365,11 @@ func newCatalogError(version string, spec apperr.Spec, mapped potatoErrors.IErro
 	if exposeErrorDetails.Load() {
 		trace = detailTrace(cause, mapped)
 	}
-	return &Error{
+	// 所有可前端提示的错误统一返回 HTTP 200，业务结果由 body 的 code 字段区分；
+	// spec.HTTPStatus 仅作为内部语义分类（决定 message 是否隐藏、err_trace 是否暴露），不再作为响应状态码。
+	return &httpError{
 		Envelope: NewError(version, []any{}, spec.Code(), message, trace),
-		status:   spec.HTTPStatus,
+		status:   http.StatusOK,
 		cause:    cause,
 	}
 }
@@ -382,7 +391,7 @@ func detailTrace(cause error, mapped potatoErrors.IError) string {
 
 // Error implements error.
 // 预期内的业务失败没有内部 cause，此时回退为公开 message，避免服务端日志拿到空字符串。
-func (e *Error) Error() string {
+func (e *httpError) Error() string {
 	if e == nil {
 		return ""
 	}
@@ -393,12 +402,12 @@ func (e *Error) Error() string {
 }
 
 // GetStatus implements huma.StatusError.
-func (e *Error) GetStatus() int {
+func (e *httpError) GetStatus() int {
 	return e.status
 }
 
 // ContentType keeps error responses on the JSON media type used by the shared envelope.
-func (*Error) ContentType(contentType string) string {
+func (*httpError) ContentType(contentType string) string {
 	return strings.Replace(contentType, "problem+", "", 1)
 }
 
