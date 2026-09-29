@@ -10,7 +10,7 @@ OUTDIR  := $(WORKDIR)/output
 TARGETNAME = generate-example-project
 
 # Go 包列表
-GOPKGS := $(shell go list ./...)
+GOPKGS  := $$(go list ./...| grep -vE "vendor|bootstrap|db/dao|db/model|dao/model|dao/queries|interfaces|mocks")
 
 # 设置编译时所需要的 Go 环境
 export GOENV = $(WORKDIR)/go.env
