@@ -3,7 +3,6 @@ package bootstrap
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/jasonlabz/potato/gormx"
 	"github.com/jasonlabz/potato/gormx/migrate"
@@ -61,7 +60,5 @@ func runMigrations(ctx context.Context) {
 		LockKey: migrationLockKey,
 		Logger:  resource.Logger,
 	})
-	if err != nil {
-		panic(fmt.Errorf("%w", err))
-	}
+	_ = exit(ctx, cfg.Strict, err)
 }

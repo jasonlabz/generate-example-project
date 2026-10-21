@@ -43,6 +43,17 @@ func MustInit(ctx context.Context) {
 	initServicer(ctx)
 }
 
+func exit(ctx context.Context, strict bool, err error) bool {
+	if err != nil {
+		if strict {
+			panic(err)
+		}
+		resource.Logger.WithError(err).Error(ctx, "init failed")
+		return true
+	}
+	return false
+}
+
 // MustMigrate 仅初始化数据库迁移所需的最小依赖并执行迁移（先 DDL 后 seed），
 // 供 cmd/migrate 等独立迁移命令使用，不启动 RMQ/Redis/ES 等服务端依赖。
 func MustMigrate(ctx context.Context) {
@@ -81,29 +92,29 @@ func initCrypto(_ context.Context) {
 	}
 }
 
-func initDB(_ context.Context) {
+func initDB(ctx context.Context) {
 	dbConf := GetConfig().DataSource
 	if !dbConf.Enable {
 		return
 	}
 	gormConfig := &gormx.Config{}
 	err := utils.CopyStruct(dbConf, gormConfig)
-	if err != nil {
-		panic(err)
+	if exit(ctx, dbConf.Strict, err) {
+		return
 	}
 	gormConfig.DBName = gormx.DefaultDBNameMaster
 	gormConfig.Logger =
 		gormx.LoggerAdapter(resource.Logger.WithCallerSkip(3))
 	_, err = gormx.InitConfig(gormConfig)
-	if err != nil {
-		panic(err)
+	if exit(ctx, dbConf.Strict, err) {
+		return
 	}
 	// dao.SetGormDB(db)
 }
 
 func initRMQ(_ context.Context) {
 	// 走默认初始化逻辑
-	// resource.RMQClient = rabbitmqx.GetRabbitMQOperator()
+	//resource.RMQClient = rabbitmqx.GetRabbitMQOperator()
 }
 
 func initRedis(_ context.Context) {
