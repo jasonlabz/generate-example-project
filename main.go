@@ -16,9 +16,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jasonlabz/potato/ginmetrics"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/keepalive"
 
 	"github.com/jasonlabz/generate-example-project/bootstrap"
+	grpcserver "github.com/jasonlabz/generate-example-project/server/grpc"
 	"github.com/jasonlabz/generate-example-project/server/router"
 )
 
@@ -107,7 +107,7 @@ func main() {
 	if grpcLis != nil {
 		_ = grpcLis.Close()
 	}
-	log.Println("Server exiting")
+	log.Println("Server exiting ...")
 }
 
 // startHTTPServer 自定义http配置
@@ -125,7 +125,7 @@ func startHTTPServer(router *gin.Engine, c *bootstrap.Config, quit chan os.Signa
 
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			quit <- os.Interrupt
+			notifyInterrupt(quit)
 			log.Fatalf("listen: %s\n", err)
 		}
 	}()
@@ -143,7 +143,7 @@ func startPProfServer(router *gin.Engine, c *bootstrap.Config, quit chan os.Sign
 	srv := &http.Server{Addr: fmt.Sprintf(":%d", pprofConf.Port), Handler: nil}
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			quit <- os.Interrupt
+			notifyInterrupt(quit)
 			log.Fatalf("pprof server failed: %v", err)
 		}
 	}()
@@ -157,30 +157,24 @@ func startGRPCServer(c *bootstrap.Config, quit chan os.Signal) (*grpc.Server, ne
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", c.GetGRPCPort()))
 	if err != nil {
-		quit <- os.Interrupt
+		notifyInterrupt(quit)
 		log.Fatalf("grpc listen failed: %v", err)
 	}
 
-	grpcCfg := c.GetServerConfig().GRPC
-	srv := grpc.NewServer(
-		grpc.KeepaliveParams(keepalive.ServerParameters{
-			MaxConnectionIdle:     300 * time.Second,
-			MaxConnectionAge:      1800 * time.Second,
-			MaxConnectionAgeGrace: 30 * time.Second,
-			Time:                  30 * time.Second,
-			Timeout:               10 * time.Second,
-		}),
-		grpc.MaxConcurrentStreams(grpcCfg.MaxConcurrentStreams),
-	)
-
+	srv := grpcserver.InitGRPCServer(c)
 	go func() {
-		if serveErr := srv.Serve(lis); serveErr != nil {
-			if !errors.Is(serveErr, net.ErrClosed) {
-				quit <- os.Interrupt
-				log.Fatalf("grpc server failed: %v", serveErr)
-			}
+		if err = srv.Serve(lis); err != nil && !errors.Is(err, grpc.ErrServerStopped) && !errors.Is(err, net.ErrClosed) {
+			notifyInterrupt(quit)
+			log.Fatalf("grpc server failed: %v", err)
 		}
 	}()
 
 	return srv, lis
+}
+
+func notifyInterrupt(quit chan os.Signal) {
+	select {
+	case quit <- os.Interrupt:
+	default:
+	}
 }
