@@ -60,19 +60,19 @@ func main() {
 		m.Use(r)
 	}
 
-	pprofSrv := startPProfServer(r, serverConfig)
-	grpcSrv, grpcLis := startGRPCServer(serverConfig)
+	// receive quit signal, ready to exit
+	quit := make(chan os.Signal, 1)
+	pprofSrv := startPProfServer(r, serverConfig, quit)
+	grpcSrv, grpcLis := startGRPCServer(serverConfig, quit)
 
 	// start program
-	srv := startHTTPServer(r, serverConfig)
+	srv := startHTTPServer(r, serverConfig, quit)
 
 	if srv == nil && pprofSrv == nil && grpcSrv == nil {
 		log.Println("no service enabled, exiting")
 		return
 	}
 
-	// receive quit signal, ready to exit
-	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	<-quit
@@ -111,7 +111,7 @@ func main() {
 }
 
 // startHTTPServer 自定义http配置
-func startHTTPServer(router *gin.Engine, c *bootstrap.Config) *http.Server {
+func startHTTPServer(router *gin.Engine, c *bootstrap.Config, quit chan os.Signal) *http.Server {
 	if !c.IsHTTPEnable() {
 		return nil
 	}
@@ -125,6 +125,7 @@ func startHTTPServer(router *gin.Engine, c *bootstrap.Config) *http.Server {
 
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			quit <- os.Interrupt
 			log.Fatalf("listen: %s\n", err)
 		}
 	}()
@@ -132,7 +133,7 @@ func startHTTPServer(router *gin.Engine, c *bootstrap.Config) *http.Server {
 	return srv
 }
 
-func startPProfServer(router *gin.Engine, c *bootstrap.Config) *http.Server {
+func startPProfServer(router *gin.Engine, c *bootstrap.Config, quit chan os.Signal) *http.Server {
 	pprofConf := c.GetPProfConfig()
 	if !pprofConf.Enable {
 		return nil
@@ -142,19 +143,21 @@ func startPProfServer(router *gin.Engine, c *bootstrap.Config) *http.Server {
 	srv := &http.Server{Addr: fmt.Sprintf(":%d", pprofConf.Port), Handler: nil}
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			quit <- os.Interrupt
 			log.Fatalf("pprof server failed: %v", err)
 		}
 	}()
 	return srv
 }
 
-func startGRPCServer(c *bootstrap.Config) (*grpc.Server, net.Listener) {
+func startGRPCServer(c *bootstrap.Config, quit chan os.Signal) (*grpc.Server, net.Listener) {
 	if !c.IsGRPCEnable() {
 		return nil, nil
 	}
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", c.GetGRPCPort()))
 	if err != nil {
+		quit <- os.Interrupt
 		log.Fatalf("grpc listen failed: %v", err)
 	}
 
@@ -173,7 +176,8 @@ func startGRPCServer(c *bootstrap.Config) (*grpc.Server, net.Listener) {
 	go func() {
 		if serveErr := srv.Serve(lis); serveErr != nil {
 			if !errors.Is(serveErr, net.ErrClosed) {
-				log.Printf("grpc server failed: %v", serveErr)
+				quit <- os.Interrupt
+				log.Fatalf("grpc server failed: %v", serveErr)
 			}
 		}
 	}()
