@@ -227,16 +227,6 @@ func defaultConfig() *Config {
 				HTTP: HTTPConfig{Enable: true},
 			},
 		},
-		DataSource: DataSource{
-			Enable:  true,
-			DBType:  "sqlite",
-			LogMode: "info",
-			Connection: Connection{
-				DSN: "file::memory:?cache=shared",
-			},
-			MaxIdleConn: 1,
-			MaxOpenConn: 1,
-		},
 	}
 }
 
