@@ -23,6 +23,18 @@ go run main.go
 
 > 构建打包用 `make all`（Linux / macOS / WSL / Git Bash）：编译 + 单测 + 打包到 `output/`。
 > `webroot/` 是前端产物占位目录，为空时构建与启动都会自动跳过前端部分。
+>
+> 镜像从 `output/` 取文件，编译可以放在镜像里也可以放在宿主机：
+>
+> ```bash
+> ./docker-build.sh                                     # 编译阶段跑 make build frontend package
+> make build frontend package && ./docker-build.sh --prebuilt   # 本机先编译，镜像只拷产物
+> ./script/dev-build.sh                                 # 没装 go 时用编译镜像跑 make（缓存依赖）
+> ```
+>
+> `--prebuilt` 要求 make 在 Linux/类 Unix 环境执行：Windows 下产出 `.exe`，放进 Linux 镜像跑不起来。
+> 运行镜像基于预构建的 `runtime-go:bookworm`（`script/Dockerfile.runtime`，通用发行版完整版
+> + `vi`、`tail`、`curl`、`ps`、`netstat` 等排查命令），首次使用先执行 `./script/build-runtime.sh`。
 
 ## 目录结构（分层架构）
 

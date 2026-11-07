@@ -1,0 +1,36 @@
+# 后端运行基础镜像：通用发行版完整版 + 排查问题常用命令。
+#
+# 一次构建、长期复用，业务 Dockerfile 直接 FROM 它，不用每次构建都跑一遍 apt-get。
+#   docker build -f script/Dockerfile.runtime -t runtime-go:bookworm .
+# 或直接执行 script/build-runtime.sh。
+#
+# BASE_IMAGE 的 glibc 不得低于编译环境（编译镜像是 golang:1.25-bookworm），
+# 否则二进制运行时报 GLIBC_2.xx not found。
+# 用 slim 底座 + 显式装需要的包，比完整版小且内容可控。
+ARG BASE_IMAGE=docker.1ms.run/library/debian:bookworm-slim
+# Debian 官方源在国内很慢，传镜像源可显著提速；留空则保持官方源
+ARG APT_MIRROR=http://mirrors.aliyun.com
+FROM ${BASE_IMAGE}
+
+LABEL description="Go 服务运行基础镜像（含排查命令）"
+
+ARG APT_MIRROR
+
+# tail 由 coreutils 自带；vi 来自 vim-tiny；其余是排障常用件
+RUN if [ -n "${APT_MIRROR}" ]; then \
+        sed -i "s|http://deb.debian.org|${APT_MIRROR}|g" /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
+        sed -i "s|http://deb.debian.org|${APT_MIRROR}|g" /etc/apt/sources.list 2>/dev/null || true; \
+    fi && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates tzdata curl vim-tiny less procps net-tools iputils-ping dnsutils tree && \
+    ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
+    echo "Asia/Shanghai" > /etc/timezone && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# 常用别名：进容器排障时 ls 带颜色、grep 带高亮
+RUN printf '%s\n' \
+    "alias ll='ls -alF'" \
+    "alias l='ls -CF'" \
+    "alias grep='grep --color=auto'" \
+    >> /etc/profile.d/aliases.sh

@@ -2,6 +2,8 @@
 bin
 coverage.out
 log
-output
 node_modules
 
+# 注意：这里不排除 output/。
+# --target prebuilt 模式需要构建上下文里有 output/（本机 make 的产物）；
+# 镜像内编译模式会先 COPY 再 make，output 会被 make package-backend 覆盖重建。

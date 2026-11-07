@@ -41,7 +41,7 @@ test: prepare
 
 # 前端构建（可选）：webroot 下存在 package.json 才执行，产物在 webroot/dist
 frontend:
-	if [ -f "webroot/dist/package.json" ]; then cd $(WEBDIR) && pnpm install && pnpm build
+	if [ -f "webroot/package.json" ]; then cd webroot && pnpm install && pnpm build; fi
 
 # package 阶段，对编译产出进行打包：
 # 二进制 + 配置（服务按 ./conf 相对路径读取配置）+ 可选目录
