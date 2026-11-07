@@ -11,9 +11,18 @@
 go run main.go
 ```
 
+一键启动（优先复用 `bin/generate-example-project`，缺失时自动编译）：
+
+```shell
+./start.sh
+```
+
 - Knife4j 文档 UI（调试模式）：`http://127.0.0.1:<port>/<服务名>/doc.html`
 - OpenAPI 3.0 文档：`http://127.0.0.1:<port>/<服务名>/v3/api-docs`
 - 示例接口：`GET http://127.0.0.1:<port>/<服务名>/health-check`
+
+> 构建打包用 `make all`（Linux / macOS / WSL / Git Bash）：编译 + 单测 + 打包到 `output/`。
+> `webroot/` 是前端产物占位目录，为空时构建与启动都会自动跳过前端部分。
 
 ## 目录结构（分层架构）
 
@@ -36,6 +45,8 @@ mocks/                     mockgen 生成的接口 mock（bash script/go-mockgen
 conf/                      配置（application.yaml、日志、迁移 SQL）
 script/                    gentol（DAO/Model 生成）、go-mockgen 脚本
 docs/                      设计文档、开发过程记录
+webroot/                   前端构建产物占位目录（为空时跳过前端相关步骤）
+start.sh                   一键启动后端（webroot 含前端工程时连带启动 vite dev）
 ```
 
 > 各层都以 `health_check`（最小样例）与 `user`（完整样例：参数、分页、文件流、错误码）两个模块作参照，
