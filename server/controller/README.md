@@ -20,8 +20,8 @@ server/controller/<module>/
 - 普通 handler 签名：`func(ctx context.Context, in *In) (*Out, error)`，注册时使用 `humax.Wrap`。
 - 分页 handler 签名：`func(ctx context.Context, in *In) ([]Out, *humax.Pagination, error)`，注册时使用 `humax.WrapPage`。
 - 文件流 handler 直接返回 `*huma.StreamResponse`（用 `humax.File` 构造），不经过 `Wrap`。
-- Operation 必须声明 `DefaultStatus: http.StatusOK`；`Errors` 声明该接口实际会返回的状态码，
-  例如 `[]int{http.StatusNotFound, http.StatusInternalServerError}`，保证文档与行为一致。
+- Operation 必须声明 `DefaultStatus: http.StatusOK`；`Errors` 只声明未预期内部故障的
+  `http.StatusInternalServerError`。可预期业务失败统一走 HTTP 200，由 Envelope.code 表达。
 - query 筛选参数不传时不筛选；只有业务不能执行的参数添加 `required:"true"`。分页统一 `page=1`、`page_size=200`，且 `page_size` 最大为 200。
 - handler 不转换错误：service 抛出的 `apperr` 错误原样上抛，由 `humax.Wrap` 统一映射，
   错误码才不会在传递中丢失。协议层面的业务失败用 `humax.BusinessError`。

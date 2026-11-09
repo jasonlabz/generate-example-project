@@ -20,7 +20,7 @@ func (c *Controller) Register(api huma.API) {
 		Method:        http.MethodGet,
 		Path:          "/health-check",
 		Summary:       "健康检查",
-		Description:   "用于负载均衡器、容器探针和运维监控检查服务是否存活。成功时返回 code=0、data=[\"success\"]；依赖检查失败时返回 500 及统一错误信封。",
+		Description:   "用于负载均衡器、容器探针和运维监控检查服务是否存活。成功时返回 code=0、data=[\"success\"]；依赖检查失败时返回 HTTP 200 与内部错误 code。",
 		Tags:          []string{"系统", "健康检查"},
 		DefaultStatus: http.StatusOK,
 		Errors:        []int{http.StatusInternalServerError},

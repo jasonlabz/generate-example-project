@@ -43,7 +43,7 @@ func TestForHTTPStatusReturnsPublicContract(t *testing.T) {
 }
 
 // TestForHTTPStatus_MapsFrameworkValidationToInvalidRequest 固定框架校验错误的归因：
-// huma 用 422 表示参数校验失败，必须归 InvalidRequest 且保留 422 的 HTTP 语义，
+// huma 用 422 表示参数校验失败，必须归 InvalidRequest 且保留 422 的语义，
 // 否则会和业务代码主动表达的 BusinessRule 撞码。
 func TestForHTTPStatus_MapsFrameworkValidationToInvalidRequest(t *testing.T) {
 	spec := ForHTTPStatus(http.StatusUnprocessableEntity)

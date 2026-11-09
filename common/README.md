@@ -21,7 +21,7 @@ common/
 
 - **响应信封**：所有 HTTP 响应统一 `humax.Envelope[T]`（成功 `humax.New`、错误 `humax.NewError`）。
 - **huma 错误**：业务失败优先使用 `apperr` 目录中登记的错误码（`apperr.NotFound.WithMessage(...)`），
-  由 `humax.FromError` 映射为登记的 HTTP 状态 + 业务 code；协议层面的失败用
+  由 `humax.FromError` 映射为 HTTP 200 + 业务 code；协议层面的失败用
   `humax.BusinessError(version, code, message)`。两者都返回统一的 `Envelope`，不退回 RFC7807。
-  未知内部错误才映射为安全的 HTTP 500。
+  所有错误均使用 HTTP 200；未知内部错误映射为安全的内部错误码和文案。
 - 详见 [humax/README.md](humax/README.md)。

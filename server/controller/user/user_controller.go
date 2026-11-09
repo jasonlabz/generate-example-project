@@ -22,7 +22,7 @@ func NewController(service user.Service) *Controller {
 }
 
 // handleGet 查询单个用户。service 已把"不存在"转换为 apperr.NotFound，
-// 这里只需原样上抛，由 humax.Wrap 统一映射为 HTTP 404 + 业务 code。
+// 这里只需原样上抛，由 humax.Wrap 统一映射为 HTTP 200 + 业务 code。
 func (c *Controller) handleGet(ctx context.Context, in *getUserInput) (*userVO, error) {
 	item, err := c.service.Get(ctx, in.ID)
 	if err != nil {

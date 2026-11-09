@@ -293,7 +293,7 @@ func HumaRecoveryLog(stack bool) func(ctx huma.Context, next func(huma.Context))
 // HumaRequestMiddleware 的 error_message 取自 gin.Errors（humagin 适配器不写入，恒为空），
 // 导致 500 的内部原因无处可查。日志携带请求上下文，可自动关联 trace_id。
 //
-// 只记录 5xx：4xx 是可预期的业务失败，由调用方处理，逐条记录会淹没真正的故障信号。
+// 只记录 5xx：业务错误通过 HTTP 200 返回，由调用方处理，逐条记录会淹没真正的故障信号。
 func LogErrorChain(ctx context.Context, err error, status int) {
 	if status < http.StatusInternalServerError {
 		return

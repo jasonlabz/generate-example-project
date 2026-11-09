@@ -21,7 +21,7 @@ func NewService(manager user.Manager) Service {
 
 // Get 按主键查询用户。
 // 记录不存在不是技术故障，而是可预期的业务结果，因此转换为 apperr.NotFound，
-// 由 humax 统一映射为 HTTP 404 + 业务 code，而不是降级成 500。
+// 由 humax 统一映射为 HTTP 200 + 业务 code，而不是降级成 500。
 func (s *serviceImpl) Get(ctx context.Context, id int64) (User, error) {
 	record, exists, err := s.manager.FindByID(ctx, id)
 	if err != nil {

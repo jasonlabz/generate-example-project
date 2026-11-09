@@ -54,10 +54,10 @@ Controller 不写业务逻辑，Service 不依赖 Gin。新增模块时在 `serv
 - 路由用 `huma.Register(api, huma.Operation{...}, handler)` 注册，`Operation` 字段对应 swag 注解（对照表见根 README）。
 - 请求/响应模型：结构体 + huma tag（`path`/`query`/`header`/`body`）+ 统一响应信封 `humax.Envelope`。
 - 预期业务失败优先返回 `common/apperr` 目录中的错误码（如 `apperr.NotFound.WithMessage(...)`），
-  由 `humax.FromError` 映射为目录登记的 HTTP 状态 + 业务 code（如 404 + 100004001）。
+  由 `humax.FromError` 映射为 HTTP 200 + 业务 code。
 - 协议层面、"参数合法但组合不支持"的失败用 `common/humax.BusinessError`。
-- 未知错误交由 `humax.Wrap` / `humax.WrapPage` 映射为安全的 HTTP 500。
-- Operation 的成功状态固定为 200；`Errors` 声明该接口实际会返回的状态码，保证文档与行为一致。
+- 未知错误交由 `humax.Wrap` / `humax.WrapPage` 映射为 HTTP 200 的安全内部错误信封（语义状态为 500）。
+- Operation 的成功状态固定为 200；`Errors` 只声明统一的 500 内部故障，业务错误由 Envelope.code 表达。
 - 控制器规范见 [controller/README.md](controller/README.md)。
 
 ## 相关文档

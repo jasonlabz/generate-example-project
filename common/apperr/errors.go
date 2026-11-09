@@ -12,8 +12,9 @@ const (
 	SystemCode = 10
 )
 
-// Spec defines one public error contract. It adds HTTP response policy to the
-// immutable potato error definition; request-scoped causes stay on IError.
+// Spec defines one public error contract. HTTPStatus records the semantic
+// severity used by logs and monitoring; the transport response remains HTTP 200.
+// Request-scoped causes stay on IError.
 type Spec struct {
 	HTTPStatus int
 
@@ -89,7 +90,7 @@ func ForHTTPStatus(status int) Spec {
 		return Conflict
 	case http.StatusUnprocessableEntity:
 		// huma 用 422（而非 400）表示请求参数语义不合法，如必填字段缺失、取值越界、
-		// 格式错误。这类框架级错误统一归 InvalidRequest，保留 422 的 HTTP 语义：
+		// 格式错误。这类框架级错误统一归 InvalidRequest，保留 422 的语义供日志与监控使用；
 		// 否则它会和业务代码主动表达的 BusinessRule 撞码，调用方无法区分
 		// "我参数写错了"与"业务规则不允许"。
 		return Spec{HTTPStatus: http.StatusUnprocessableEntity, base: InvalidRequest.base}

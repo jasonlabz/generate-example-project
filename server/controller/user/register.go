@@ -15,19 +15,19 @@ import (
 
 // Register registers all HTTP operations maintained by the user Controller.
 //
-// Errors 声明的是该接口实际可能返回的状态码：业务失败会带上 apperr 目录中登记的
-// HTTP 语义（如 100004001 → 404），只有未预期的故障才是 500。声明齐全才能让
-// OpenAPI 文档与真实行为一致。
+// Errors 声明未预期故障的 HTTP 状态码。可预期业务失败统一返回 HTTP 200，并通过
+// Envelope.code 区分具体业务错误；未预期的内部故障返回 HTTP 200 的内部错误信封，
+// 其语义状态为 500。
 func (c *Controller) Register(api huma.API) {
 	huma.Register(api, huma.Operation{
 		OperationID:   "user-get",
 		Method:        http.MethodGet,
 		Path:          "/users/{id}",
 		Summary:       "查询用户",
-		Description:   "按主键查询用户；用户不存在时返回 404 与业务 code 100004001。",
+		Description:   "按主键查询用户；用户不存在时返回 HTTP 200 与业务 code 100004001。",
 		Tags:          []string{"用户"},
 		DefaultStatus: http.StatusOK,
-		Errors:        []int{http.StatusNotFound, http.StatusInternalServerError},
+		Errors:        []int{http.StatusInternalServerError},
 	}, humax.Wrap(consts.APIVersionV1, c.handleGet))
 
 	huma.Register(api, huma.Operation{
@@ -46,10 +46,10 @@ func (c *Controller) Register(api huma.API) {
 		Method:        http.MethodPost,
 		Path:          "/users",
 		Summary:       "创建用户",
-		Description:   "用户名全局唯一；重名时返回 409 与业务 code 100005001。",
+		Description:   "用户名全局唯一；重名时返回 HTTP 200 与业务 code 100005001。",
 		Tags:          []string{"用户"},
 		DefaultStatus: http.StatusOK,
-		Errors:        []int{http.StatusConflict, http.StatusInternalServerError},
+		Errors:        []int{http.StatusInternalServerError},
 	}, humax.Wrap(consts.APIVersionV1, c.handleCreate))
 
 	huma.Register(api, huma.Operation{
@@ -57,10 +57,10 @@ func (c *Controller) Register(api huma.API) {
 		Method:        http.MethodDelete,
 		Path:          "/users/{id}",
 		Summary:       "删除用户",
-		Description:   "用户不存在时返回 404 与业务 code 100004001；重复删除同一 ID 结果一致。",
+		Description:   "用户不存在时返回 HTTP 200 与业务 code 100004001；重复删除同一 ID 结果一致。",
 		Tags:          []string{"用户"},
 		DefaultStatus: http.StatusOK,
-		Errors:        []int{http.StatusNotFound, http.StatusInternalServerError},
+		Errors:        []int{http.StatusInternalServerError},
 	}, humax.Wrap(consts.APIVersionV1, c.handleDelete))
 
 	huma.Register(api, huma.Operation{
@@ -68,10 +68,10 @@ func (c *Controller) Register(api huma.API) {
 		Method:        http.MethodGet,
 		Path:          "/users/export",
 		Summary:       "导出用户",
-		Description:   "以文件流返回用户列表（CSV）。格式暂不支持 xlsx，传入时返回 422 与业务 code 100006001。",
+		Description:   "以文件流返回用户列表（CSV）。格式暂不支持 xlsx，传入时返回 HTTP 200 与业务 code 100006001。",
 		Tags:          []string{"用户"},
 		DefaultStatus: http.StatusOK,
-		Errors:        []int{http.StatusUnprocessableEntity, http.StatusInternalServerError},
+		Errors:        []int{http.StatusInternalServerError},
 		Responses: map[string]*huma.Response{
 			"200": humax.BinaryResponse("用户列表 CSV 文件", "text/csv"),
 		},

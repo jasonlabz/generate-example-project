@@ -71,7 +71,7 @@ func TestController_Get_ReturnsSuccessEnvelope(t *testing.T) {
 }
 
 // TestController_Get_MapsNotFoundToHTTPStatus 验证错误码不会被降级成 500：
-// service 抛出 apperr.NotFound，接口必须返回 404 与目录登记的 code。
+// service 抛出 apperr.NotFound，接口必须返回 HTTP 200 与目录登记的 code。
 func TestController_Get_MapsNotFoundToHTTPStatus(t *testing.T) {
 	router, userService := newUserRouter(t)
 	userService.EXPECT().Get(gomock.Any(), int64(7)).
@@ -98,10 +98,9 @@ func TestController_Get_MapsNotFoundToHTTPStatus(t *testing.T) {
 	}
 }
 
-// TestController_Get_ExposesInnerCauseInDebugMode 验证 4xx 业务错误也能带出内部原因：
-// service 用 apperr.NotFound.WithErr 注入真实故障时，调试模式下 err_trace 可见，
-// 便于排查"业务上查不到"到底是没数据还是下游挂了。
-func TestController_Get_ExposesInnerCauseInDebugMode(t *testing.T) {
+// TestController_Get_HidesInnerCauseInDebugMode 验证业务错误不会向前端暴露内部原因：
+// 即使 service 用 apperr.NotFound.WithErr 注入真实故障，调试模式下也只返回业务 code/message。
+func TestController_Get_HidesInnerCauseInDebugMode(t *testing.T) {
 	humax.ConfigureErrorDetails(true)
 	t.Cleanup(func() { humax.ConfigureErrorDetails(false) })
 
@@ -125,12 +124,8 @@ func TestController_Get_ExposesInnerCauseInDebugMode(t *testing.T) {
 	if payload.Code != apperr.NotFound.Code() {
 		t.Fatalf("code = %d, want %d", payload.Code, apperr.NotFound.Code())
 	}
-	// message 是概括性文案，err_trace 是完整报错链（含目录 code 与内部原因）。
-	if !strings.Contains(payload.ErrTrace, "dial tcp 10.0.0.5:5432: connect: connection refused") {
-		t.Fatalf("err_trace = %q, want it to carry the inner cause", payload.ErrTrace)
-	}
-	if !strings.Contains(payload.ErrTrace, "100004001") {
-		t.Fatalf("err_trace = %q, want it to carry the catalog code", payload.ErrTrace)
+	if payload.ErrTrace != "" {
+		t.Fatalf("err_trace = %q, want omitted for business errors", payload.ErrTrace)
 	}
 }
 
@@ -260,11 +255,11 @@ func TestController_Register_PublishesDocumentedStatuses(t *testing.T) {
 
 	NewController(nil).Register(api)
 
-	// 文档必须声明真实的失败状态，否则前端按 OpenAPI 生成的 client 会漏处理分支。
+	// 业务失败通过 HTTP 200 的 Envelope.code 表达，OpenAPI 只额外声明统一的 500。
 	wantStatuses := map[string][]string{
 		"/users":        {"200", "500"},
-		"/users/{id}":   {"200", "404", "500"},
-		"/users/export": {"200", "422", "500"},
+		"/users/{id}":   {"200", "500"},
+		"/users/export": {"200", "500"},
 	}
 	for path, want := range wantStatuses {
 		pathItem := api.OpenAPI().Paths[path]

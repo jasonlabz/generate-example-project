@@ -209,8 +209,7 @@ var exposeErrorDetails atomic.Bool
 
 // ConfigureErrorDetails 控制是否把详细报错链写入 err_trace。
 //
-// 打开后，任何错误（4xx / 5xx 一视同仁）都会带上 err_trace：message 保留概括性文案供
-// 调用方展示，err_trace 给出完整错误链供开发者定位。它会把表名、SQL、下游地址等内部
+// 打开后，只有 5xx 语义错误会带上 err_trace。它会把表名、SQL、下游地址等内部
 // 细节暴露给调用方，必须只在可信环境下启用（Router 中按 gin.IsDebugging() 驱动）。
 func ConfigureErrorDetails(expose bool) {
 	exposeErrorDetails.Store(expose)
@@ -222,7 +221,7 @@ func ConfigureErrorDetails(expose bool) {
 // 写进 gin.Errors），中间件只能看到已经脱敏的响应体。想在生产环境保留完整错误链，
 // 必须在错误离开 handler 的这一刻把它交出来。
 //
-// err 是 handler 返回的原始错误（保留完整错误链），status 是即将返回的 HTTP 状态码。
+// err 是 handler 返回的原始错误（保留完整错误链），status 是错误的语义 HTTP 状态码。
 // 回调同步执行，实现方必须自行保证不阻塞、不 panic——它位于请求的关键路径上。
 type ErrorReporter func(ctx context.Context, err error, status int)
 
@@ -262,8 +261,8 @@ func notifyErrorReporter(ctx context.Context, err error) {
 }
 
 // resolveStatus 从错误推导语义 HTTP 状态码，供 ErrorReporter 判定严重级别。
-// 它读取 apperr 目录登记的语义状态，独立于实际响应状态码——响应恒为 200，
-// 语义状态只用于日志/监控分级（例如只记 5xx）。
+// 它读取 apperr 目录登记的语义状态，独立于实际响应状态码；响应统一使用 HTTP 200，
+// 语义状态只用于日志/监控分级。
 func resolveStatus(err error) int {
 	var sharedError *httpError
 	if errors.As(err, &sharedError) {
@@ -281,7 +280,8 @@ func resolveStatus(err error) int {
 	return http.StatusInternalServerError
 }
 
-// InternalServerError converts an unexpected error into a 500 response.
+// InternalServerError converts an unexpected error into a safe HTTP 200 envelope
+// with the internal-error code whose semantic status is 500.
 func InternalServerError(version string, cause error) huma.StatusError {
 	if cause == nil {
 		cause = errors.New(apperr.Internal.Message())
@@ -293,10 +293,10 @@ func InternalServerError(version string, cause error) huma.StatusError {
 //
 // 与 InternalServerError 的区别：业务失败对调用方是可预期、可处理的，因此响应体仍是
 // 统一的 Envelope（非零 code + 公开 message），不会退回 huma 的 RFC7807 格式；
-// HTTP 状态由 apperr 目录中该 code 登记的语义决定（例如 100004001 → 404）。
+// 可预期业务失败统一使用 HTTP 200，具体语义由 code/message 表达。
 //
 // code 应当取 apperr 中已登记的错误码；传入未登记的 code 时回退为 InvalidRequest 的
-// HTTP 语义，但保留调用方传入的 code 与 message，避免前端拿到无法定位的错误。
+// 业务错误语义，但保留调用方传入的 code 与 message，避免前端拿到无法定位的错误。
 func BusinessError(version string, code int, message string) huma.StatusError {
 	spec, ok := apperr.Lookup(code)
 	if !ok {
@@ -305,14 +305,8 @@ func BusinessError(version string, code int, message string) huma.StatusError {
 	if message == "" {
 		message = spec.Message()
 	}
-	trace := ""
-	if exposeErrorDetails.Load() {
-		// 业务失败由调用方直接判定，没有更深的错误来源，因此用与 IError.Error() 一致的
-		// "code -> message" 形式，保证调试时 err_trace 始终有内容可看。
-		trace = fmt.Sprintf("%d -> %s", code, message)
-	}
 	return &httpError{
-		Envelope: NewError(version, []any{}, code, message, trace),
+		Envelope: NewError(version, []any{}, code, message, ""),
 		status:   http.StatusOK,
 	}
 }
@@ -335,7 +329,8 @@ func FromError(version string, err error) huma.StatusError {
 	return InternalServerError(version, err)
 }
 
-// MapError preserves shared errors and converts unexpected errors to a safe 500 response.
+// MapError preserves shared errors and converts unexpected errors to a safe HTTP 200 envelope
+// with the internal-error code whose semantic status is 500.
 func MapError(version string, err error) error {
 	return FromError(version, err)
 }
@@ -358,20 +353,22 @@ func ConfigureHumaErrorFactory(version string) {
 
 func newCatalogError(version string, spec apperr.Spec, mapped potatoErrors.IError, cause error) *httpError {
 	message := mapped.Message()
-	if spec.HTTPStatus >= http.StatusInternalServerError {
+	if isInternalSpec(spec) {
 		message = spec.Message()
 	}
 	trace := ""
-	if exposeErrorDetails.Load() {
+	if cause != nil && spec.HTTPStatus >= http.StatusInternalServerError && exposeErrorDetails.Load() {
 		trace = detailTrace(cause, mapped)
 	}
-	// 所有可前端提示的错误统一返回 HTTP 200，业务结果由 body 的 code 字段区分；
-	// spec.HTTPStatus 仅作为内部语义分类（决定 message 是否隐藏、err_trace 是否暴露），不再作为响应状态码。
 	return &httpError{
 		Envelope: NewError(version, []any{}, spec.Code(), message, trace),
 		status:   http.StatusOK,
 		cause:    cause,
 	}
+}
+
+func isInternalSpec(spec apperr.Spec) bool {
+	return spec.Code() == apperr.Internal.Code()
 }
 
 // detailTrace 返回写入 err_trace 的详细报错链。

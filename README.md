@@ -155,9 +155,9 @@ func (c *Controller) handleList(ctx context.Context, in *listUsersInput) ([]user
 // 注册时使用 humax.WrapPage(consts.APIVersionV1, c.handleList)。
 ```
 
-`Operation.DefaultStatus` 固定为 `http.StatusOK`。`Operation.Errors` 声明该接口**实际可能返回**
-的状态码，例如查询单条声明 `[]int{http.StatusNotFound, http.StatusInternalServerError}`：
-业务错误会带上 `apperr` 目录中登记的 HTTP 语义（100004001 → 404），只有未预期的故障才是 500。
+`Operation.DefaultStatus` 固定为 `http.StatusOK`。`Operation.Errors` 声明未预期内部故障的
+状态码（通常为 `[]int{http.StatusInternalServerError}`）；可预期业务错误统一返回 200，
+通过 `apperr` 目录中的业务 code 区分。
 声明齐全才能让 OpenAPI 文档与真实行为一致，前端按文档生成的 client 才不会漏掉分支。
 
 ### 4. 业务层
@@ -233,40 +233,27 @@ func registerV1GroupAPI(api huma.API, middleware ...huma.Middlewares) {
 ### 错误与响应
 
 响应信封统一为 `humax.Envelope`（版本 + code/message/data），错误响应复用同一结构，不退回 RFC7807。
-HTTP 状态与业务 code 是**双轨**：HTTP 状态让调用方做通用处理，业务 code 让调用方精确定位。
-
-**业务失败用真实的 4xx，不用 HTTP 200。** 两者都能表达失败，选 4xx 的理由：
-
-| 维度 | HTTP 200 + 业务 code | 4xx + 业务 code（本模板） |
-|------|---------------------|--------------------------|
-| 成功率/SLO 指标 | 业务失败被算作成功，告警失真 | 4xx 与 5xx 天然分离 |
-| 网关与客户端重试 | 无法按状态码决策 | 可对 5xx 重试、对 4xx 不重试 |
-| OpenAPI 文档 | 只能描述 200，失败分支丢失 | 失败状态可如实声明 |
-| 前端处理成本 | — | 拦截器已按 status 分流，code 用于细分 |
-
-> 若上游系统强制要求"一律 200"，改 `apperr.Spec.HTTPStatus` 的取值即可，code 体系不受影响；
-> 但请同步接受成功率指标失真的代价。
+错误响应统一使用 HTTP 200 + 业务 code；内部错误使用安全的内部错误 code/message。
 
 ```text
 成功            HTTP 200  code = 0
-参数校验失败     HTTP 422  code = 100001001   （框架错误，huma 自动映射）
-业务失败         HTTP 404/409/422/403/...      code = 目录中登记的业务码
-未知内部错误     HTTP 500  code = 100008001   （对外恒定文案，不泄漏内部 cause）
+参数校验失败     HTTP 200  code = 100001001   （框架错误，huma 自动映射）
+业务失败         HTTP 200  code = 目录中登记的业务码
+未知内部错误     HTTP 200  code = 100008001   （对外恒定文案，不泄漏内部 cause）
 ```
 
 > huma 用 **422**（不是 400）表示参数不合法——必填缺失、取值越界、格式错误都走这里。
-> `apperr.ForHTTPStatus` 把框架 422 归到 `InvalidRequest`，同时保留 422 的 HTTP 语义。
-> 否则它会和业务代码主动表达的 `BusinessRule`（同为 422）撞码，调用方无法区分
-> "我参数写错了"和"业务规则不允许"。
+> `apperr.ForHTTPStatus` 仍负责把框架错误归类到 `InvalidRequest`，具体原因通过
+> `message` 返回给前端。
 
 - Controller handler 返回原始业务数据与 error，由 `humax.Wrap` / `humax.WrapPage` 统一加壳。
 - **业务失败优先走 `apperr` 目录**（推荐）：service 层返回 `apperr.NotFound.WithMessage(...)`，
-  controller 原样上抛，`humax` 自动映射为目录登记的 HTTP 状态 + code。
+  controller 原样上抛，`humax` 自动映射为 HTTP 200 + code。
 - Controller 层遇到"参数本身合法、但当前组合不被支持"的失败时，用
-  `humax.BusinessError(version, code, message)`：它同样返回统一信封，不落入 RFC7807。
-  未登记的 code 会回退为 `InvalidRequest` 的 HTTP 语义，但保留传入的 code 与 message。
+  `humax.BusinessError(version, code, message)`：它返回 HTTP 200 的统一信封，不落入 RFC7807。
+  未登记的 code 仍保留传入的 code 与 message。
 - `humax.ConfigureHumaErrorFactory` 必须在创建 Huma API 前于 Router 中调用；参数校验
-  错误因此返回 HTTP 422 + code 100001001（不是 200）。
+  错误因此返回 HTTP 200 + code 100001001。
 - 未知内部错误对外使用稳定的 `服务内部错误`，不把 cause 写进 `message`。
 
 #### message 与 err_trace 的分工
@@ -274,24 +261,24 @@ HTTP 状态与业务 code 是**双轨**：HTTP 状态让调用方做通用处理
 `message` 是**概括性文案**，给调用方直接展示；`err_trace` 是**详细报错链**，给开发者定位问题。
 
 `humax.ConfigureErrorDetails(true)`（Router 中由 `gin.IsDebugging()` 驱动，即
-`application.debug: true`）打开后，**任何错误都会带上 err_trace**，4xx / 5xx 一视同仁：
+`application.debug: true`）打开后，只有 5xx 语义的内部错误带上 `err_trace`：
 
 ```go
 // 5xx：cause 是未知故障，err_trace 含 fmt.Errorf 逐层包装的完整上下文
 fmt.Errorf("query user: %w", dbErr)
-// → message: "服务内部错误"        err_trace: "query user: connection refused: 127.0.0.1:5432"
+// → HTTP 200, message: "服务内部错误"  err_trace: "query user: connection refused: 127.0.0.1:5432"
 
-// 4xx：cause 是 apperr 目录错误，err_trace 含目录 code 与内部原因
+// 业务错误：cause 是 apperr 目录错误，err_trace 不返回给前端
 apperr.NotFound.WithErr(errors.New("db: timeout"))
-// → message: "请求的资源不存在"     err_trace: "100004001 -> 请求的资源不存在\n inner error: db: timeout"
+// → message: "请求的资源不存在"     err_trace: omitted
 
-// 4xx：只有业务文案、没有内部原因时，回退为目录链，保证调试时看得到来源
+// 业务错误：只有业务文案、没有内部原因时，也不返回内部链路
 apperr.NotFound.WithMessage("用户 9 不存在")
-// → message: "用户 9 不存在"       err_trace: "100004001 -> 用户 9 不存在"
+// → message: "用户 9 不存在"       err_trace: omitted
 
 // controller 主动判定的业务失败
 humax.BusinessError(consts.APIVersionV1, apperr.BusinessRule.Code(), "暂不支持 xlsx 导出")
-// → message: "暂不支持 xlsx 导出"   err_trace: "100006001 -> 暂不支持 xlsx 导出"
+// → message: "暂不支持 xlsx 导出"   err_trace: omitted
 ```
 
 关闭开关（生产环境）时 `err_trace` 字段整体省略（`omitempty`），内部原因不出现在响应中。
@@ -306,10 +293,10 @@ humax.BusinessError(consts.APIVersionV1, apperr.BusinessRule.Code(), "暂不支�
 // service：把"记录不存在"这类可预期结果转换为目录中的错误码，而不是 fmt.Errorf 丢掉语义。
 record, exists, err := s.manager.FindByID(ctx, id)
 if err != nil {
-    return User{}, fmt.Errorf("find user %d: %w", id, err)   // 技术故障 → 500
+    return User{}, fmt.Errorf("find user %d: %w", id, err)   // 技术故障 → HTTP 200 + 内部 code（语义 500）
 }
 if !exists {
-    return User{}, apperr.NotFound.WithMessage(fmt.Sprintf("用户 %d 不存在", id))  // 业务失败 → 404
+    return User{}, apperr.NotFound.WithMessage(fmt.Sprintf("用户 %d 不存在", id))  // 业务失败 → HTTP 200 + 业务 code（语义 404）
 }
 
 // controller：原样上抛，不做任何转换或包装，错误码才不会在传递中丢失。
@@ -334,8 +321,8 @@ if in.Format == "xlsx" {
 > 链断掉之后只能落回 500。
 >
 > ```go
-> fmt.Errorf("get user: %w", apperr.NotFound.WithErr(dbErr))  // → 404 + 100004001 ✅
-> fmt.Errorf("get user: %v", apperr.NotFound.WithErr(dbErr))  // → 500 + 100008001 ❌
+> fmt.Errorf("get user: %w", apperr.NotFound.WithErr(dbErr))  // → HTTP 200 + 100004001（语义 404）✅
+> fmt.Errorf("get user: %v", apperr.NotFound.WithErr(dbErr))  // → HTTP 200 + 100008001（语义 500）❌
 > ```
 >
 > 结论：包装业务错误时坚持用 `%w` 即可，不必为了避免丢码而放弃包装上下文。
@@ -351,7 +338,7 @@ if in.Format == "xlsx" {
 humax.SetErrorReporter(middleware.LogErrorChain)
 ```
 
-`LogErrorChain` 只记录 5xx（4xx 是可预期的业务失败，逐条记录会淹没故障信号），
+`LogErrorChain` 只记录 5xx（业务错误通过 HTTP 200 返回，逐条记录会淹没故障信号），
 日志携带请求上下文，可自动关联 `trace_id`：
 
 ```text

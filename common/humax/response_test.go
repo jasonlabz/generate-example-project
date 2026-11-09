@@ -294,7 +294,7 @@ func TestWrap_PreservesBusinessError(t *testing.T) {
 	}
 }
 
-func TestFromError_ExposesFullChainForBusinessErrorInDebugMode(t *testing.T) {
+func TestFromError_OmitsBusinessErrorChainInDebugMode(t *testing.T) {
 	humax.ConfigureErrorDetails(true)
 	t.Cleanup(func() { humax.ConfigureErrorDetails(false) })
 
@@ -309,25 +309,21 @@ func TestFromError_ExposesFullChainForBusinessErrorInDebugMode(t *testing.T) {
 	if payload["message"] != "请求的资源不存在" {
 		t.Fatalf("message = %#v, want catalog message", payload["message"])
 	}
-	trace, _ := payload["err_trace"].(string)
-	if !strings.Contains(trace, "connection refused: 127.0.0.1:5432") {
-		t.Fatalf("err_trace = %q, want it to carry the inner cause", trace)
-	}
-	if !strings.Contains(trace, "100004001") {
-		t.Fatalf("err_trace = %q, want it to carry the catalog code", trace)
+	if _, ok := payload["err_trace"]; ok {
+		t.Fatalf("err_trace = %#v, want omitted for business errors", payload["err_trace"])
 	}
 }
 
-func TestFromError_FallsBackToCatalogChainWhenCauseIsAbsent(t *testing.T) {
+func TestFromError_OmitsBusinessErrorChainWhenCauseIsAbsent(t *testing.T) {
 	humax.ConfigureErrorDetails(true)
 	t.Cleanup(func() { humax.ConfigureErrorDetails(false) })
 
-	// 只有业务文案、没有内部原因时不能留空——调试时要明确看到报错来源。
+	// 业务文案不属于内部错误，调试响应也不返回 err_trace。
 	output := humax.FromError("v1", apperr.NotFound.WithMessage("用户 9999 不存在"))
 
 	payload := marshalPayload(t, output)
-	if trace, _ := payload["err_trace"].(string); !strings.Contains(trace, "用户 9999 不存在") {
-		t.Fatalf("err_trace = %q, want catalog chain fallback", trace)
+	if _, ok := payload["err_trace"]; ok {
+		t.Fatalf("err_trace = %#v, want omitted for business errors", payload["err_trace"])
 	}
 }
 
@@ -349,8 +345,8 @@ func TestBusinessError_CarriesCodeAndMessageInDebugMode(t *testing.T) {
 	output := humax.BusinessError("v1", apperr.BusinessRule.Code(), "暂不支持 xlsx 导出")
 
 	payload := marshalPayload(t, output)
-	if payload["err_trace"] != "100006001 -> 暂不支持 xlsx 导出" {
-		t.Fatalf("err_trace = %#v, want code -> message", payload["err_trace"])
+	if _, ok := payload["err_trace"]; ok {
+		t.Fatalf("err_trace = %#v, want omitted for business errors", payload["err_trace"])
 	}
 }
 
@@ -365,7 +361,7 @@ func TestBusinessError_OmitsTraceWhenDetailsDisabled(t *testing.T) {
 	}
 }
 
-func TestConfigureHumaErrorFactory_CarriesTraceForValidationErrorInDebugMode(t *testing.T) {
+func TestConfigureHumaErrorFactory_OmitsTraceForValidationErrorInDebugMode(t *testing.T) {
 	originalFactory := huma.NewErrorWithContext
 	originalError := huma.NewError
 	t.Cleanup(func() {
@@ -377,15 +373,15 @@ func TestConfigureHumaErrorFactory_CarriesTraceForValidationErrorInDebugMode(t *
 	humax.ConfigureHumaErrorFactory("v1")
 
 	// 参数校验的 message 仍保留明细（生产环境也要让调用方知道哪个参数错了），
-	// err_trace 在调试模式下额外给出 "code -> message" 链。
+	// 业务校验错误不返回内部 err_trace。
 	errorResponse := huma.NewErrorWithContext(nil, http.StatusBadRequest, "expected number >= 1")
 	payload := marshalPayload(t, errorResponse)
 
 	if payload["code"] != float64(100001001) {
 		t.Fatalf("code = %#v, want 100001001", payload["code"])
 	}
-	if trace, _ := payload["err_trace"].(string); !strings.Contains(trace, "100001001") {
-		t.Fatalf("err_trace = %q, want catalog code", trace)
+	if _, ok := payload["err_trace"]; ok {
+		t.Fatalf("err_trace = %#v, want omitted for validation errors", payload["err_trace"])
 	}
 }
 
@@ -523,7 +519,8 @@ func TestConfigureHumaErrorFactory_MapsValidationErrorToBusinessEnvelope(t *test
 }
 
 // TestConfigureHumaErrorFactory_MapsFramework422ToInvalidRequest 覆盖 huma 真实的校验失败路径：
-// huma v2 用 422（不是 400）表示参数不合法，响应需保留 422，业务码归 InvalidRequest。
+// huma v2 用 422（不是 400）表示参数不合法，统一错误工厂将其转换为 HTTP 200，
+// 业务码归 InvalidRequest。
 func TestConfigureHumaErrorFactory_MapsFramework422ToInvalidRequest(t *testing.T) {
 	originalFactory := huma.NewErrorWithContext
 	originalError := huma.NewError
@@ -570,6 +567,42 @@ func TestConfigureHumaErrorFactory_PreservesInternalServerError(t *testing.T) {
 	}
 	if _, ok := payload["err_trace"]; ok {
 		t.Fatal("err_trace must not expose the internal error")
+	}
+}
+
+func TestFromErrorKeepsCustomCatalogErrorsOnHTTP200(t *testing.T) {
+	output := humax.FromError("v1", apperr.DependencyUnavailable.WithMessage("依赖服务连接失败"))
+	if output.GetStatus() != http.StatusOK {
+		t.Fatalf("status = %d, want %d", output.GetStatus(), http.StatusOK)
+	}
+
+	payload := marshalPayload(t, output)
+	if payload["code"] != float64(apperr.DependencyUnavailable.Code()) {
+		t.Fatalf("code = %#v, want %d", payload["code"], apperr.DependencyUnavailable.Code())
+	}
+	if payload["message"] != "依赖服务连接失败" {
+		t.Fatalf("message = %#v, want custom frontend message", payload["message"])
+	}
+}
+
+func TestFromErrorDependencyUnavailableKeepsTraceInDebugMode(t *testing.T) {
+	humax.ConfigureErrorDetails(true)
+	t.Cleanup(func() { humax.ConfigureErrorDetails(false) })
+
+	output := humax.FromError("v1", apperr.DependencyUnavailable.
+		WithErr(errors.New("目录探查失败: 引擎返回非2xx状态码: 500")).
+		WithMessage("数据加载失败，请稍后重试"))
+	if output.GetStatus() != http.StatusOK {
+		t.Fatalf("status = %d, want %d", output.GetStatus(), http.StatusOK)
+	}
+
+	payload := marshalPayload(t, output)
+	if payload["message"] != "数据加载失败，请稍后重试" {
+		t.Fatalf("message = %#v, want customized message", payload["message"])
+	}
+	trace, _ := payload["err_trace"].(string)
+	if !strings.Contains(trace, "目录探查失败") {
+		t.Fatalf("err_trace = %q, want internal cause in debug mode", trace)
 	}
 }
 

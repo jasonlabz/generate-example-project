@@ -15,7 +15,7 @@
 | `FromError` / `MapError` | 把 service 错误映射为统一错误响应 | `@Failure` |
 | `Result` / `PaginationResult` | 成功结果与错误的统一返回入口 | — |
 | `File` / `SimpleFile` | Huma 文件流响应 | 二进制文件响应 |
-| `InternalServerError` | 500 统一错误 | `@Failure 500` |
+| `InternalServerError` | 500 语义统一错误（响应 HTTP 200） | `@Failure 500` |
 
 ## 使用
 
@@ -23,13 +23,13 @@
 // 成功
 return humax.Success(consts.APIVersionV1, data), nil
 
-// 未知内部错误（HTTP 500，message 不暴露 cause）
+// 未知内部错误（HTTP 200，message 不暴露 cause）
 return nil, humax.InternalServerError(consts.APIVersionV1, err)
 
-// 业务失败（推荐走 apperr 目录，HTTP 状态与 code 都由目录决定）
+// 业务失败（推荐走 apperr 目录，HTTP 200 + code/message）
 return nil, apperr.NotFound.WithMessage(fmt.Sprintf("用户 %d 不存在", id))
 
-// 协议层面的业务失败：参数合法但组合不支持（HTTP 422 + code 100006001）
+// 协议层面的业务失败：参数合法但组合不支持（HTTP 200 + code 100006001）
 return nil, humax.BusinessError(consts.APIVersionV1, apperr.BusinessRule.Code(), "暂不支持 xlsx 导出")
 
 // 分页
@@ -55,43 +55,42 @@ handler 返回 `(*huma.StreamResponse, error)`。
 
 ## 错误契约
 
-HTTP 状态与业务 code 是双轨：状态让调用方做通用处理，code 让调用方精确定位。
+所有错误响应统一使用 HTTP 200 + 业务 code；内部错误使用安全的内部错误文案。
 
 ```text
 成功            HTTP 200  code = 0
-参数校验失败     HTTP 422  code = 100001001   huma 自动映射
-业务失败         HTTP 404/409/422/403/...      apperr 目录中登记的 code
-未知内部错误     HTTP 500  code = 100008001   对外恒定文案
+参数校验失败     HTTP 200  code = 100001001   huma 自动映射
+业务失败         HTTP 200  code = apperr 目录中登记的业务码
+未知内部错误     HTTP 200  code = 100008001   对外恒定文案
 ```
 
 - 成功响应统一 `Envelope`（版本 + code/message/data）；错误响应复用同一结构，不退回 RFC7807。
 - 业务失败优先用 `apperr` 目录：`humax.FromError` 用 `errors.As` 在**整条错误链**里定位
-  `potato/errors.IError`，因此 `fmt.Errorf("...: %w", apperrErr)` 包装后 code 与 HTTP 语义依然保留
+  `potato/errors.IError`，因此 `fmt.Errorf("...: %w", apperrErr)` 包装后 code 依然保留
   （实测包两层也不丢）。真正会丢的是 `%v`——它截断错误链，链断后就只能降级成 500。
 - `humax.BusinessError(version, code, message)` 用于协议层面的失败；未登记的 code 回退为
   `InvalidRequest` 的 HTTP 语义，但保留传入的 code 与 message。
-- Huma 参数校验由 `ConfigureHumaErrorFactory` 转为 HTTP 422 + code 100001001。
-  huma 用 422 表示参数不合法，`apperr.ForHTTPStatus` 把它归 `InvalidRequest` 但保留 422 状态；
-  否则会和业务代码主动表达的 `BusinessRule`（同为 422）撞码。
-- 只有未知内部错误返回 HTTP 500，响应固定为 `服务内部错误`，不泄漏内部 cause。
+- Huma 参数校验由 `ConfigureHumaErrorFactory` 转为 HTTP 200 + code 100001001。
+  参数具体原因写入 `message`，供前端直接展示。
+- 所有错误响应均使用 HTTP 200；只有内部错误固定为 `服务内部错误`，不泄漏内部 cause。
 
 ### message 与 err_trace 的分工
 
 `message` 是概括性文案（给调用方展示），`err_trace` 是详细报错链（给开发者定位）。
 
 `ConfigureErrorDetails(true)`（由 Router 按 `gin.IsDebugging()` 驱动）打开后，
-**任何错误都会带上 `err_trace`**，5xx 与 4xx 一视同仁：
+只有 5xx 语义的内部错误会带上 `err_trace`：
 
 | 错误构造 | HTTP | err_trace |
 |----------|------|-----------|
-| `fmt.Errorf("query user: %w", dbErr)` | 500 | `"query user: connection refused"` |
-| `apperr.NotFound.WithErr(dbErr)` | 404 | `"100004001 -> 请求的资源不存在\n inner error: db: timeout"` |
-| `apperr.NotFound.WithMessage("用户 9 不存在")` | 404 | `"100004001 -> 用户 9 不存在"`（回退到目录链） |
-| `humax.BusinessError(v1, 100006001, "暂不支持 xlsx")` | 422 | `"100006001 -> 暂不支持 xlsx"` |
-| Huma 参数校验 | 422 | `"100001001 -> query.page_size: 必须小于等于200"` |
+| `fmt.Errorf("query user: %w", dbErr)` | 200 | `"query user: connection refused"` |
+| `apperr.NotFound.WithErr(dbErr)` | 200 | omitted |
+| `apperr.NotFound.WithMessage("用户 9 不存在")` | 200 | omitted |
+| `humax.BusinessError(v1, 100006001, "暂不支持 xlsx")` | 200 | omitted |
+| Huma 参数校验 | 200 | omitted |
 
 实现见 `detailTrace`：能拿到 `cause` 就输出它的完整 `Error()`；拿不到（如纯 `WithMessage`
-构造的业务错误）就回退到目录错误本身，保证调试时 `err_trace` 始终有内容。
+构造的业务错误）也不返回 `err_trace`。
 
 生产环境关闭该开关时，`err_trace` 字段完全省略（`omitempty`），内部原因不出现在响应中。
 
@@ -102,4 +101,4 @@ HTTP 状态与业务 code 是双轨：状态让调用方做通用处理，code �
 ## 原理
 
 huma 约定：handler 返回的 `Error` 实现 `huma.StatusError`（`GetStatus() int`）。
-本包由此把可预期失败映射到 `apperr` 目录登记的 HTTP 状态，未知故障固定为 500。
+本包由此把可预期失败映射到 HTTP 200 + `apperr` 目录业务码，未知故障使用内部 code（语义状态为 500）。
