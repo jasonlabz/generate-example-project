@@ -1,6 +1,6 @@
 bin/
 coverage.out
-log/
+/log
 output/
 node_modules/
 
