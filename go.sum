@@ -126,8 +126,8 @@ github.com/jasonlabz/gorm-dm-driver v0.1.5 h1:xqjlnUzmR1vH/njSGBJffJ4Wn+xsWBHL22
 github.com/jasonlabz/gorm-dm-driver v0.1.5/go.mod h1:JGj8wDQ0iwe7+ouh/jAjh5bn1mwo532lrxdhLlzDneE=
 github.com/jasonlabz/knife4go v1.0.2 h1:mirmUrzbuaKUlujqbt+rPggGEZfIlIPZ+KYMzqjMOD4=
 github.com/jasonlabz/knife4go v1.0.2/go.mod h1:7o/Ecex77JTNzdKchTIHnZ7g6WdsFgrFdvXwC9XmzZY=
-github.com/jasonlabz/potato v1.2.4 h1:N6ZGl83feRVvLRkC38h3NYR0596pcNck2ekzCMgzT3E=
-github.com/jasonlabz/potato v1.2.4/go.mod h1:B75cUW8QjDcYvtYyGt3TqUncIyPJqmTDupMcBuCagTI=
+github.com/jasonlabz/potato v1.2.6 h1:EYVeU7gw+0Me/f7qcXi2C5E5uHEwRpzo0e0Q0009xdI=
+github.com/jasonlabz/potato v1.2.6/go.mod h1:B75cUW8QjDcYvtYyGt3TqUncIyPJqmTDupMcBuCagTI=
 github.com/jasonlabz/sqlite v1.11.1 h1:Posd+lfxea1rGcJxYwMPao9sfg2XqKmE4awd35BM5ig=
 github.com/jasonlabz/sqlite v1.11.1/go.mod h1:BCtCDO+MuqIlWuuLEgXKkNqiKnfs9W1OAMauunOQ9hs=
 github.com/jinzhu/inflection v1.0.0 h1:K317FqzuhWc8YvSVlFMCCUb36O/S9MCKRDI7QkRKD/E=
